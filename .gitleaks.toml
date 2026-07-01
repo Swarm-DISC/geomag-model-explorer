@@ -1,0 +1,19 @@
+# Per-repo secret-scan config for `gitleaks` (used by .heimdall/gate.sh when the binary is
+# present; the gate falls back to a built-in grep otherwise). This file is COMMITTED and
+# PUBLISHED, so it must contain only generic patterns — never internal hostnames/identifiers
+# (those are scrubbed separately by the gate's denylist, which is never committed).
+
+title = "secret scan"
+
+[extend]
+useDefault = true   # gitleaks' built-in rule pack (GitHub/GitLab/AWS/Slack/PEM/... tokens)
+
+[allowlist]
+description = "Heimdall control files and common false positives"
+paths = [
+  '''(^|/)\.heimdall\.toml$''',
+  '''(^|/)\.gitleaks\.toml$''',
+  '''(^|/)uv\.lock$''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)\.env\.example$''',
+]

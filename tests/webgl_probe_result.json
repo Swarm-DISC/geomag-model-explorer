@@ -1,0 +1,14 @@
+{
+  "ok_config": "default",
+  "results": {
+    "default": {
+      "webgl2": true,
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "vendor": "Google Inc. (Google)",
+      "max_texture_size": 8192,
+      "rgba16f_linear_ok": true,
+      "readback_r": 143,
+      "error": null
+    }
+  }
+}

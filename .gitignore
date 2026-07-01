@@ -1,0 +1,10 @@
+# local environments / caches
+.venv/
+__pycache__/
+.pytest_cache/
+node_modules/
+
+# fetched + exported data (reproducible via fetch.py + export.py;
+# provenance lives in data/MANIFEST.toml, which IS committed)
+data/raw/
+web/data/

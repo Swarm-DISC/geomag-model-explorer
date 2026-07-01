@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Geomag Model Explorer — geomagnetic field globe</title>
+<link rel="stylesheet" href="./style.css">
+<script type="importmap">
+  {"imports": {"three": "./vendor/three.module.js"}}
+</script>
+</head>
+<body>
+<header id="controls">
+  <div class="controls-row" id="controls-primary">
+    <span id="title">Geomag Model Explorer</span>
+    <!-- studies.js injects #family-bar (Model series) + #study-tabs after #title -->
+  </div>
+  <div class="controls-row" id="controls-secondary">
+    <fieldset id="field-toggles" aria-label="fields"></fieldset>
+    <fieldset id="component-radios" aria-label="component"></fieldset>
+    <div id="date-control">
+      <input type="date" id="date-picker">
+      <span id="fetch-chip" hidden></span>
+    </div>
+  </div>
+</header>
+
+<main id="globe">
+  <div id="shell-control">
+    <label for="shell-slider">shell</label>
+    <input type="range" id="shell-slider" min="0" max="0" step="1" value="0">
+    <span id="shell-label"></span>
+  </div>
+  <div id="readout" hidden></div>
+  <div id="colorbar">
+    <span id="colorbar-min"></span>
+    <div id="colorbar-ramp"></div>
+    <span id="colorbar-max"></span>
+    <button id="colorbar-lock" aria-pressed="false"
+      title="lock colour scale">🔓</button>
+  </div>
+  <div id="attribution">
+    Data: <a href="https://earth.esa.int/eogateway/missions/swarm"
+      target="_blank" rel="noopener">ESA Swarm</a> via
+    <a href="https://vires.services" target="_blank" rel="noopener">VirES</a>
+    — <span id="model-attribution">Comprehensive Inversion models
+    (MCO/MLI/MIO/MMA_SHA_2C; DTU Space, IPGP et&nbsp;al.)</span>
+  </div>
+  <div id="error" hidden></div>
+</main>
+
+<footer id="timebar">
+  <button id="play-btn" aria-label="play/pause">⏵</button>
+  <input type="range" id="time-slider" min="0" max="1440" step="1" value="0">
+  <span id="time-label">00:00</span>
+  <select id="speed-select" aria-label="playback speed">
+    <option value="1">1×</option>
+    <option value="2">2×</option>
+    <option value="4" selected>4×</option>
+    <option value="8">8×</option>
+  </select>
+</footer>
+
+<script type="module" src="./main.js"></script>
+</body>
+</html>

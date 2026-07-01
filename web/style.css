@@ -1,0 +1,303 @@
+:root {
+  --bg: #06080f;
+  --panel: #0d1220;
+  --text: #cdd6ea;
+  --muted: #6b7693;
+  --accent: #d4af37;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 system-ui, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- top control strip ---- */
+#controls {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;               /* vertical gap between the two rows */
+  padding: 0.4rem 0.9rem;
+  background: var(--panel);
+  border-bottom: 1px solid #1c2438;
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+}
+
+#title {
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+fieldset {
+  display: flex;
+  gap: 0.7rem;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.field-toggle, .comp-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.field-toggle.unavailable { color: var(--muted); cursor: not-allowed; }
+
+#date-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* shell control: vertical overlay pinned to the globe's left edge
+   (positioned inside #globe, like #readout / #colorbar) */
+#shell-control {
+  position: absolute;
+  left: 0.8rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(13, 18, 32, 0.7);
+  padding: 0.5rem;
+  border-radius: 6px;
+  font-size: 0.85em;
+  color: var(--muted);
+}
+
+#shell-slider {
+  writing-mode: vertical-lr;   /* modern vertical range (Chromium 121+) */
+  direction: rtl;              /* min (CMB, idx 0) at bottom, high alt on top */
+  height: 180px;
+  width: auto;
+}
+
+#shell-label { color: var(--text); text-align: center; }
+
+#date-picker {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid #2a3552;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+}
+
+/* locked to the preconfigured day on the Combined tab (features/studies.js) */
+#date-picker:disabled {
+  color: var(--muted);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#fetch-chip {
+  background: #233055;
+  border-radius: 999px;
+  padding: 0.1rem 0.7rem;
+  font-size: 0.85em;
+}
+
+/* ---- study tabs (studies feature; injected by features/studies.js) ---- */
+#study-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+#study-tabs button {
+  background: none;
+  border: 1px solid #2a3552;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.1rem 0.7rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+#study-tabs button[aria-selected="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+#series-select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid #2a3552;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  max-width: 19em;
+}
+
+/* ---- model families (families feature, v2.9) ---- */
+#family-bar {
+  color: var(--muted);
+  font-size: 0.85em;
+  margin-right: 0.5rem;
+}
+
+#family-bar select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid #2a3552;
+  border-radius: 4px;
+  padding: 0.1rem 0.3rem;
+}
+
+#study-tabs button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+#sv-toggle {
+  display: inline-flex;
+  gap: 0.6rem;
+}
+
+/* the hidden attribute must beat the display rules above (UA sheet loses) */
+#sv-toggle[hidden],
+#field-toggles[hidden] {
+  display: none;
+}
+
+#fetch-chip.error { background: #5b1a1a; color: #ffd7d7; }
+
+/* ---- globe ---- */
+#globe {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#globe canvas { display: block; }
+
+#colorbar {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85em;
+  color: var(--text);
+  background: rgba(13, 18, 32, 0.7);
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+}
+
+#colorbar-ramp {
+  width: 160px;
+  height: 12px;
+  border-radius: 3px;
+  background-image: url("./textures/colormap_nio.png");
+  background-size: 100% 100%;
+}
+
+#colorbar-lock {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid #2a3552;
+  border-radius: 4px;
+  height: 1.6rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+#colorbar-lock[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+#readout {
+  position: absolute;
+  left: 1rem;
+  top: 0.8rem;
+  background: rgba(13, 18, 32, 0.75);
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9em;
+  pointer-events: none;
+}
+
+#attribution {
+  position: absolute;
+  left: 1rem;
+  bottom: 0.8rem;
+  font-size: 0.75em;
+  color: var(--muted);
+  background: rgba(13, 18, 32, 0.6);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+}
+
+#attribution a { color: #8fa3cc; }
+
+#error {
+  position: absolute;
+  inset: auto 1rem 1rem 1rem;
+  background: #5b1a1a;
+  color: #ffd7d7;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  font-family: monospace;
+  white-space: pre-wrap;
+}
+
+/* ---- bottom time bar ---- */
+#timebar {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.45rem 0.9rem;
+  background: var(--panel);
+  border-top: 1px solid #1c2438;
+}
+
+#play-btn {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid #2a3552;
+  border-radius: 4px;
+  width: 2.2rem;
+  height: 1.8rem;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+#time-slider { flex: 1; }
+
+#time-label {
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2em;
+}
+
+#speed-select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid #2a3552;
+  border-radius: 4px;
+  padding: 0.15rem 0.3rem;
+}

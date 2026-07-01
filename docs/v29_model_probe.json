@@ -1,0 +1,180 @@
+{
+  "probed_at": "2026-06-12T19:19:51.645157+00:00",
+  "catalog": {
+    "n_available": 30,
+    "candidates_present": {
+      "IGRF": true,
+      "CHAOS-Core": true,
+      "CHAOS-Static": true,
+      "CHAOS-MMA-Primary": true,
+      "CHAOS-MMA-Secondary": true,
+      "LCS-1": true,
+      "MF7": true
+    },
+    "wdmam_like": [],
+    "chaos_like": [
+      "CHAOS-Core",
+      "CHAOS-Static",
+      "CHAOS-MMA-Primary",
+      "CHAOS-MMA-Secondary",
+      "CHAOS-MIO",
+      "CHAOS",
+      "CHAOS-MMA"
+    ],
+    "igrf_like": [
+      "IGRF"
+    ],
+    "crust_like": [
+      "LCS-1",
+      "MF7",
+      "MLI_SHA_2C",
+      "MLI_SHA_2D",
+      "MLI_SHA_2E"
+    ]
+  },
+  "models": {
+    "IGRF": {
+      "alias": "IGRF",
+      "expression": "IGRF(max_degree=13,min_degree=1)",
+      "validity": {
+        "start": "1900-01-01T00:00:00Z",
+        "end": "2030-01-01T00:00:00Z"
+      }
+    },
+    "CHAOS-Core": {
+      "alias": "CHAOS-Core",
+      "expression": "'CHAOS-Core'(max_degree=20,min_degree=1)",
+      "validity": {
+        "start": "1997-02-07T05:23:17.067838Z",
+        "end": "2026-08-08T08:23:39.372002Z"
+      }
+    },
+    "CHAOS-Static": {
+      "alias": "CHAOS-Static",
+      "expression": "'CHAOS-Static'(max_degree=185,min_degree=21)",
+      "validity": {
+        "start": "0001-01-01T00:00:00Z",
+        "end": "4000-01-01T00:00:00Z"
+      }
+    },
+    "CHAOS-MMA-Primary": {
+      "alias": "CHAOS-MMA-Primary",
+      "expression": "'CHAOS-MMA-Primary'(max_degree=2,min_degree=1)",
+      "validity": {
+        "start": "2000-01-01T00:00:00Z",
+        "end": "2026-06-12T20:30:00Z"
+      }
+    },
+    "CHAOS-MMA-Secondary": {
+      "alias": "CHAOS-MMA-Secondary",
+      "expression": "'CHAOS-MMA-Secondary'(max_degree=2,min_degree=1)",
+      "validity": {
+        "start": "2000-01-01T00:00:00Z",
+        "end": "2026-06-12T20:30:00Z"
+      }
+    },
+    "LCS-1": {
+      "alias": "LCS-1",
+      "expression": "'LCS-1'(max_degree=185,min_degree=1)",
+      "validity": {
+        "start": "0001-01-01T00:00:00Z",
+        "end": "4000-01-01T00:00:00Z"
+      }
+    },
+    "MF7": {
+      "alias": "MF7",
+      "expression": "MF7(max_degree=133,min_degree=16)",
+      "validity": {
+        "start": "0001-01-01T00:00:00Z",
+        "end": "4000-01-01T00:00:00Z"
+      }
+    }
+  },
+  "composed_mma": {
+    "ok": true,
+    "surface_abs_nT": {
+      "max": 41.63910834212917,
+      "p99": 41.234455718447805,
+      "median": 28.923748717150684
+    }
+  },
+  "sv": {
+    "MCO_SHA_2C": {
+      "ok": true,
+      "when": "2018-06-01T12:00:00",
+      "span_years": 1.0,
+      "shells": {
+        "cmb": {
+          "max": 58014.45704514714,
+          "p99": 40765.76707773702,
+          "median": 9174.523803109028,
+          "component_max": [
+            25586.014177440782,
+            50305.54027602024,
+            56755.066660385404
+          ]
+        },
+        "surface": {
+          "max": 224.18993679124932,
+          "p99": 195.70478839715716,
+          "median": 75.79867815657103,
+          "component_max": [
+            100.18761155257744,
+            92.0578698848949,
+            221.80403642428314
+          ]
+        }
+      }
+    },
+    "CHAOS-Core": {
+      "ok": true,
+      "when": "2018-06-01T12:00:00",
+      "span_years": 1.0,
+      "shells": {
+        "cmb": {
+          "max": 71302.98655081609,
+          "p99": 51507.06245566833,
+          "median": 15216.448754020446,
+          "component_max": [
+            42579.55528373085,
+            45858.29630452162,
+            70875.599885298
+          ]
+        },
+        "surface": {
+          "max": 224.19205941926043,
+          "p99": 195.94892143275538,
+          "median": 75.87189606228418,
+          "component_max": [
+            100.1540595063052,
+            91.60154716929264,
+            221.70884298387818
+          ]
+        }
+      }
+    }
+  },
+  "sv_cmb_1deg": {
+    "when": "2018-06-01T12:00:00",
+    "results": {
+      "Core = 'MCO_SHA_2C'": {
+        "max": 58865.86881292424,
+        "p99": 41655.41549595072,
+        "component_max": [
+          26463.803554010694,
+          51575.66093614494,
+          58675.61538643442
+        ]
+      },
+      "Core = 'CHAOS-Core'": {
+        "max": 71460.06251909802,
+        "p99": 52342.71706571018,
+        "component_max": [
+          44192.27310845,
+          47562.07917193661,
+          71114.27947782708
+        ]
+      }
+    }
+  }
+}

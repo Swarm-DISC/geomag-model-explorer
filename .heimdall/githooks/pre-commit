@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Heimdall pre-commit — fast secret check on staged changes (best-effort; the full gate runs
+# on push). No-op when gitleaks is absent.
+set -uo pipefail
+if command -v gitleaks >/dev/null 2>&1; then
+  cfg=(); [ -f .gitleaks.toml ] && cfg=(--config .gitleaks.toml)
+  if ! gitleaks protect --staged --no-banner --redact "${cfg[@]}"; then
+    echo "pre-commit: gitleaks flagged a staged secret — aborting (override with 'git commit --no-verify' only if sure)" >&2
+    exit 1
+  fi
+fi
+exit 0

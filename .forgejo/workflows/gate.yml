@@ -1,0 +1,21 @@
+# Heimdall gate — INTERNAL side (Forgejo Actions). Gates PRs into synced branches.
+# Runs the full gate INCLUDING the infra-identifier scrub; the denylist is supplied as the
+# Forgejo Actions secret HEIMDALL_DENYLIST (safe to store on the internal host).
+#
+# NB: requires a registered Forgejo Actions runner. If none exists, the gate is instead run by
+# the workstation `heimdall-gate.timer`, which posts the same `heimdall-gate` commit status.
+name: heimdall gate
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  heimdall-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run heimdall gate
+        env:
+          HEIMDALL_DENYLIST: ${{ secrets.HEIMDALL_DENYLIST }}
+        run: bash .heimdall/gate.sh

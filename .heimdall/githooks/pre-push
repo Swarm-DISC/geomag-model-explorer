@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Heimdall pre-push — run the gate before pushing to a synced branch (fast local feedback).
+# Installed via core.hooksPath=.heimdall/githooks by `heimdall adopt`.
+set -uo pipefail
+root="$(git rev-parse --show-toplevel)"
+while read -r _localref _localsha remoteref _remotesha; do
+  case "$remoteref" in
+    refs/heads/main) exec bash "$root/.heimdall/gate.sh" ;;
+  esac
+done
+exit 0

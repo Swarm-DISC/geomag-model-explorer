@@ -1,0 +1,21 @@
+# Keep the build context lean and reproducible (deployment-setup builds from a clean clone;
+# this mainly protects local `docker build .` from copying host-only state into the image).
+.git
+.venv
+**/__pycache__
+*.pyc
+.pytest_cache
+.claude
+
+# Generated/cached data — not part of the source image (see deploy/Dockerfile DATA NOTE).
+data/raw
+web/data
+_model_eval_input_*.hdf5
+
+# Heimdall control tooling + CI workflows are not needed inside the runtime image.
+.heimdall
+.github
+.forgejo
+
+# Local test artifacts.
+tests/artifacts

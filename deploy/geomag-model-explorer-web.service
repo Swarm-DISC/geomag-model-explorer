@@ -1,0 +1,39 @@
+# geomag-model-explorer — geomagnetic field globe (REFERENCE COPY; live copy in
+# ~/.config/systemd/user/).
+#
+# Relocatable: paths use the %h specifier (the operator's home). REQUIRES a
+# ~/heimdall/geomag-model-explorer checkout owned by the user that runs this unit.
+#
+# Serves the static frontend + tiles + day-fetch API on :8212, bound to
+# 0.0.0.0 so the portal nginx container reaches it via host-gateway.
+# Portal wiring: deploy/PORTAL_HANDOFF.md.
+#
+# Install (one-time):
+#   cp deploy/geomag-model-explorer-web.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now geomag-model-explorer-web.service
+#   loginctl enable-linger "$USER"
+# Status / logs / restart:
+#   systemctl --user status geomag-model-explorer-web.service
+#   journalctl --user -u geomag-model-explorer-web.service -f
+#   systemctl --user restart geomag-model-explorer-web.service
+
+[Unit]
+Description=geomag-model-explorer — geomagnetic field globe (http on :8212)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/heimdall/geomag-model-explorer
+# systemd user units do NOT inherit the login shell's PATH; uv lives in
+# ~/.local/bin. `--extra fetch` keeps the venv stable across the service and
+# the day-fetch subprocesses (which need viresclient) — plain `uv run` would
+# flip the venv between synced states on every job.
+Environment=PATH=%h/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+ExecStart=%h/.local/bin/uv run --extra fetch uvicorn serve:app --host 0.0.0.0 --port 8212
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
