@@ -1,10 +1,11 @@
-"""Relief feature (PLAN v2.6 step B) against a sandboxed server (:8220) with
-the flag on: the Relief checkbox displaces the surface (canvas changes, the
-silhouette gains/loses pixels) and untoggling restores the exact previous
-pixels (uRelief == 0 is bit-identical); r=1 round-trips through the permalink
-(garbage ignored); playback runs with relief on; and with the sun flag also
-on, enabling the sun overlay re-lights the relief (the uLightDir handoff).
-Flag-off (:8221, same data) shows no checkbox — exactly v1."""
+"""Relief feature (PLAN v2.6 step B; on by default since v2.12) against a
+sandboxed server (:8220) with the flag on: the Relief checkbox displaces the
+surface (canvas changes, the silhouette gains/loses pixels) and untoggling
+restores the exact previous pixels (uRelief == 0 is bit-identical); the off
+state round-trips as r=0 (absent = on; the pre-v2.12 r=1 still parses;
+garbage ignored); playback runs with relief on; and with the sun flag also
+on, enabling Sunlight re-lights the relief (the uLightDir handoff).
+Flag-off (:8221, same data) shows no checkbox and never displaces."""
 from __future__ import annotations
 
 import json
@@ -120,10 +121,13 @@ def _wait_ready(page):
 
 
 def test_relief_toggle_and_exact_restore(servers, watched_page):
+    # r=0&sun=0 is the v1 look (the v2.6 bit-identity reference) now that
+    # both default on
     on, _off = servers
     page, _errors = watched_page
-    page.goto(on + "/#f=crust&c=Up&s=surface", timeout=TIMEOUT_MS)
+    page.goto(on + "/#f=crust&c=Up&s=surface&r=0&sun=0", timeout=TIMEOUT_MS)
     _wait_ready(page)
+    assert not page.is_checked("#relief-toggle")
     flat = page.evaluate(CANVAS_JS)
     flat_silhouette = page.evaluate(SILHOUETTE_JS)
     page.screenshot(path=str(ARTIFACTS / "relief_off.png"))
@@ -151,11 +155,13 @@ def test_relief_permalink_roundtrip(servers, watched_page):
     _wait_ready(page)
     assert page.evaluate("() => window.geomagModelExplorer.state.relief") is True
     assert page.is_checked("#relief-toggle")
-    page.wait_for_function(
-        "() => location.hash.includes('r=1')", timeout=TIMEOUT_MS)
-    page.uncheck("#relief-toggle")
+    # the write-back normalizes the pre-v2.12 r=1 away (on = the default) ...
     page.wait_for_function(
         "() => !location.hash.includes('r=')", timeout=TIMEOUT_MS)
+    # ... and writes the off form once relief is switched off
+    page.uncheck("#relief-toggle")
+    page.wait_for_function(
+        "() => location.hash.includes('r=0')", timeout=TIMEOUT_MS)
 
 
 def test_garbage_relief_hash_degrades(servers, watched_page):
@@ -163,8 +169,9 @@ def test_garbage_relief_hash_degrades(servers, watched_page):
     page, _errors = watched_page
     page.goto(on + "/#r=banana", timeout=TIMEOUT_MS)
     _wait_ready(page)
-    assert page.evaluate("() => window.geomagModelExplorer.state.relief") is False
-    assert not page.is_checked("#relief-toggle")
+    # garbage degrades to the default — on, since v2.12
+    assert page.evaluate("() => window.geomagModelExplorer.state.relief") is True
+    assert page.is_checked("#relief-toggle")
 
 
 def test_playback_with_relief_on(servers, watched_page):
@@ -180,12 +187,13 @@ def test_playback_with_relief_on(servers, watched_page):
 
 
 def test_sun_lights_the_relief(servers, watched_page):
-    """The v2.6 integration surface: with relief on, enabling the sun overlay
-    swings uLightDir from the headlight to the view-space sun, and the canvas
-    re-shades."""
+    """The v2.6 integration surface (v2.12: overlay retired, same handoff):
+    with relief on, enabling Sunlight swings uLightDir from the headlight to
+    the view-space sun, and the canvas re-shades."""
     on, _off = servers
     page, _errors = watched_page
-    page.goto(on + "/" + DEMO_HASH + "&t=12:00", timeout=TIMEOUT_MS)
+    # sun=0 boots on the headlight so the handoff is observable
+    page.goto(on + "/" + DEMO_HASH + "&t=12:00&sun=0", timeout=TIMEOUT_MS)
     _wait_ready(page)
     headlight = page.evaluate(LIGHT_JS)
     before = page.evaluate(CANVAS_JS)
@@ -214,9 +222,9 @@ def test_flag_off_has_no_relief(servers, watched_page):
     page, _errors = watched_page
     page.goto(off + "/#r=1", timeout=TIMEOUT_MS)
     _wait_ready(page)
+    # state.relief defaults on but is inert without the module: no displacement
     assert page.evaluate(
         "() => document.getElementById('relief-toggle')") is None
-    assert page.evaluate("() => window.geomagModelExplorer.state.relief") is False
     assert page.evaluate(
         "() => window.geomagModelExplorer.globe.fieldMaterial"
         ".uniforms.uRelief.value") == 0

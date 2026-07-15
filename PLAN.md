@@ -15,7 +15,8 @@ The four contributions to Earth's magnetic field — core (MCO_SHA_2C), crust
 (MLI_SHA_2C), ionosphere (MIO_SHA_2C), magnetosphere (MMA_SHA_2C), the Swarm
 Level-2 Comprehensive Inversion chain, evaluated via viresclient only —
 rendered as colormapped shells on a three.js globe. Field toggles (summed on
-the GPU), component picker (N / E / Up / F), shell slider (CMB through
+the GPU; all four on by default since v2.12), component picker (Northward /
+Eastward / Upward / Intensity — keys N / E / Up / F), shell slider (CMB through
 500 km mantle steps to the surface, then the unified 0–1500 km altitude
 ladder at 100 km steps shared by every model — v2.7), colorbar scale lock (freezes the colour range so
 magnitude changes across shells/days stay visible; persisted in permalinks
@@ -26,15 +27,26 @@ Governance shipped in v2.1/v2.2 (write-ups archived in HISTORY.md): a
 deploy-time feature-flag registry (`features.json` → `/api/features`,
 dynamically imported modules in `web/features/`), permalink state in the URL
 hash (stability contract: garbage ignored), and the colorbar scale lock.
-v2.6 added the sun overlay (subsolar glyph + terminator from the displayed
-UT, flag `sun`) and relief mode (the displayed scalar displaces the shell,
-hillshaded — lit by the actual sun when both flags are on; flag `relief`).
-v2.9 (flag `families`) put a page-level "Model series" selector (Swarm CI /
-CHAOS) over per-source tabs — Combined models (≡ Daily; under CHAOS a
-curated 15-min diurnal series), Core with a B ↔ dB/dt toggle (derived
-secular variation in nT/yr, yearly 2014–2023 series per family), and
-Ionosphere (the Seasons tab) — with missing layers greyed out with the
-reason (CHAOS deliberately has no ionospheric layer).
+v2.6 added sun-derived lighting (flag `sun`; since v2.12 the surface itself
+is shaded by day/night from the displayed UT — the original subsolar glyph
++ terminator ring overlay is retired) and relief mode (the displayed scalar
+displaces the shell, hillshaded — lit by the actual sun when both flags are
+on; flag `relief`). v2.12 added the ECEF | ECI reference-frame switch (flag
+`frame`) and flipped the defaults to all-four-fields + sunlight + relief on.
+v2.9 (flag `families`) added the model families (Swarm CI / CHAOS): Combined
+models (≡ Daily; under CHAOS a curated 15-min diurnal series), Core with a
+B ↔ dB/dt toggle (derived secular variation in nT/yr, yearly 2014–2023 series
+per family), and Ionosphere (the Seasons tab) — with missing layers greyed out
+with the reason (CHAOS deliberately has no ionospheric layer). v2.10 inverted
+the selectors into two dropdowns: a primary "Field to explore" (All ≡ Combined
+models / Core / Ionosphere) and a secondary "Model" (Swarm CI / CHAOS) that
+greys out where the chosen field has no data. v2.11 covers **every
+grid-evaluable VirES model** (probe: `docs/v211_model_probe.json`): Crust and
+Magnetosphere join the field dropdown; MCO_SHA_2D, IGRF (5-yearly 1900–2025
+century study), LCS-1, MF7, MLI_SHA_2D, MIO_SHA_2D and MMA_SHA_2F ride
+single-field families; CHAOS-MIO, AMPS and MLI_SHA_2E stay unevaluated but
+visible greyed-out with the reason; and an ⓘ modal (flag `modelinfo`)
+documents the served model behind every on-screen layer.
 
 ```
 fetch.py   the ONLY module that talks to VirES (uv --extra fetch)
@@ -319,6 +331,139 @@ the CMB),
 *Verified:* `tests/test_families_browser.py` (12 scenarios, flag on + off,
 zero console errors) + full suite (90 passed) + live pass
 (`tests/artifacts/live_v29_*.png`).
+
+### Phase v2.10 — selector inversion (Field to explore → Model) ✅ (shipped 2026-07-01)
+
+Human-directed UI change: choose the study first. The v2.9 lineup (a "Model
+series" dropdown over a per-source tab strip) becomes two dropdowns — a
+**primary "Field to explore"** select (All / Core / Ionosphere; "All" ≡ the
+former "Combined models") and a **secondary "Model"** select (Swarm CI /
+CHAOS). Field is primary: the Model options grey out where the chosen field
+has no data (e.g. Ionosphere × CHAOS — CHAOS has no ionospheric layer), and
+picking such a field falls the model back to one that has it (`switchField`
+mirrors the old `switchFamily`→`bestField` fallback). Presentation-only: study
+ids (`daily`/`core`/`seasons`) and `state.family` are unchanged, so
+`permalink.js` is untouched and every v2.3–v2.9 link (incl.
+`tab=`/`series=`/`family=`) round-trips bit-identically. The whole change lives
+in `web/features/studies.js` (+ `web/style.css`, an `index.html` comment).
+Demos unchanged from v2.9. *Verified:* `tests/test_families_browser.py` /
+`test_studies_browser.py` rewired to drive `#field-select` (incl. the
+field-primary model fallback + grey-out) + full suite + live browser pass.
+
+### Phase v2.11 — all VirES models + model-info ⓘ ✅ (shipped 2026-07-01)
+
+Every grid-evaluable model VirES serves (probe: `docs/v211_model_probe.json`,
+30 catalog names) is now selectable. **ci and chaos stay the only multi-field
+lenses**; each remaining model is a **single-field family** riding one
+curated series: core — MCO_SHA_2D (`core-secular@mco2d`, yearly 2014–2017,
+its full frozen validity) and IGRF (`core-secular@igrf`, 5-yearly
+**1900–2025**, the full-range century study; core-sv stored at ±150k — the
+1900s CMB |Bdot| tops the 100k default); crust — LCS-1 (±2000 nT storage),
+MF7, MLI_SHA_2D (timeless: the new `kind="static"` 1-epoch/single-step
+series `crust-static@*`, incl. ci/chaos twins); iono — MIO_SHA_2D
+(`mio-seasonal-2020@mio2d`); magneto — MMA_SHA_2F (`daily-2020-01-01@mma2f`).
+The "Field to explore" dropdown gains **Crust** (kind `static`; timebar
+hidden — single epoch) and **Magnetosphere** (kind-less like All, gated to
+its field, so it *reuses* the day cache / the CHAOS day's magneto layer —
+no duplicate data). **Unevaluated by decision, greyed in the dropdown with
+the reason** (2026-07-01): CHAOS-MIO (the 2026-06-12 decision stands), AMPS
+(polar current climatology, not a global field), MLI_SHA_2E (degree 600 ≫
+the 1° grid). Aliases (MCO_SHA_2X, CHAOS, SwarmCI, -Primary/-Secondary
+halves) are covered indirectly. Manifest **v4** (additive): per-field
+`model`/`sv`, per-series `models`, top-level `models` (validity + served
+expression from `--validity`). The **ⓘ model-info modal** (flag `modelinfo`,
+`web/features/model-info.js`, IDEAS §6.2) opens a native `<dialog>` naming
+the served model behind each on-screen layer with degree range, validity,
+grid/cadence/storage, an honest caveat paragraph, and the
+unevaluated/alias footer. `tab=` permalink key is now functional (kind-less
+tabs are indistinguishable from data alone); `fieldVmax` fixed so a series'
+crust uses its own stats, not MLI's; `#timebar[hidden]` CSS fixed; playback
+guards the zero-span single-epoch timeline. Follow-up (user report
+2026-07-03): the grey-out is now **symmetric** — fields the chosen model
+can't serve disable in the Field dropdown (previously picking one silently
+swapped the model back, e.g. All × MMA_SHA_2F offered Crust → Swarm CI).
+Demos:
+`/#tab=core&series=core-secular@igrf&e=1950-06-01T12:00&f=core-sv&c=Up&s=cmb`,
+`/#tab=crust&series=crust-static@lcs1&f=crust&c=Up&s=surface`,
+`/#tab=magneto&series=daily-2020-01-01@mma2f&f=magneto&c=Up&s=h500`.
+*Verified:* fast suites (48) green; live :8212 browser pass 46/46 checks,
+zero console errors (`tests/artifacts/live_v211_*.png`);
+`test_families_browser.py` extended (Crust/Magnetosphere studies,
+unevaluated entries, modal, magneto tab= round-trip).
+
+### Phase v2.12 — reference frames + surface sunlight + defaults refresh ✅ (approved 2026-07-08, implemented 2026-07-08 on branch `frames-and-sunlight`)
+
+IDEAS §1.4 promoted as its two-way subset (human-directed): a global
+**ECEF | ECI** reference-frame control — plain radios, no disclosure nesting,
+no sun-fixed mode yet, though `web/features/frame.js` keeps a FRAMES table +
+one `frameAngle()` so the third mode is a table row when wanted
+(`(180 − subsolarPoint(ut).lon) · DEG`). ECI poses the globe group by the
+mean-solar hour angle from the displayed UT (+Y polar axis, 15°/hr; one
+quaternion poses the globe and the sun lighting — IDEAS §1.4's contract), so
+Daily playback shows the Earth spinning eastward under a sun that holds still
+up to the equation of time (±4°). Permalink `frame=<id>`, written only when
+≠ ecef; unknown ids degrade to ecef (stability contract). Hover picking
+applies the inverse earth quaternion so the readout stays geographic.
+
+Bundled in the same approval:
+
+- **Sun → Sunlight** (flag `sun`, key `sun=`, `#sun-toggle` id all kept): the
+  v2.6 overlay (terminator ring + subsolar glyph) is retired; the toggle now
+  shades the globe surface itself by day/night — object-space `uSunDir` +
+  `uSunlight` uniforms in the field *and* coast fragments (soft ~±5°
+  terminator band, 0.35 night floor), so the terminator reads as a lighting
+  boundary and, being object-space, is rotation-proof under ECI for free.
+  The v2.6 uLightDir handoff (relief hillshade follows the sun while both
+  flags are on) is unchanged in logic, now frame-aware (world sun =
+  earth quaternion × ecef sun).
+- **Defaults refresh**: all four fields on, relief on, sunlight on; shell
+  stays h500, component Up. Permalink learns the off forms `sun=0` / `r=0`
+  (key absent = the new on default; old explicit `=1` links still parse;
+  `f=` already round-trips the full list incl. empty).
+- **Labels/footer**: component radios + hover readout display Northward /
+  Eastward / Upward / Intensity (`N`/`E`/`Up`/`F` stay the architectural keys
+  in `c=`, COMPONENT_MASK, radio values/ids); the attribution line reads
+  "An ESA Swarm project via VirES — …".
+
+v2.6 bit-identity is preserved via the all-off path (`sun=0&r=0`:
+`uSunlight == 0 && uRelief == 0` leaves color untouched); the *default* look
+changes by design. Pre-v2.12 links that never carried `sun=`/`r=` now render
+with both on — absent-means-default is the contract and the defaults moved.
+
+Demos: ECI playback `/#day=2020-01-01&t=00:00&f=iono&c=Up&s=h100&frame=eci`
+(press play: the globe spins, the Sq blob and the night shading hold still);
+v1 look `/#f=crust&c=Up&s=surface&sun=0&r=0`.
+*Verified:* fast suites green (54); browser suites rewritten/re-anchored
+in-tree (`test_frame_browser.py` new; sun suite re-targeted from the retired
+overlay to the uniforms) but not run on this host (SwiftShader sandbox
+timeouts — known); real-data smoke against a checkout serve on :8230 —
+17/17 checks (boot defaults, uniforms, hash normalization with no
+sun=/r=/frame= keys, frame=eci → exactly 90° about +Y at 06:00 UT and back,
+sun=0&r=0 off-forms, zero console errors) + eyeballed screenshots (midnight
+night-side, noon lit, ECI 06:00 with the Americas rotated into view,
+night-dimmed).
+
+**Landing-view tune (2026-07-15, human-directed):** booting at t=00:00 faced
+the viewer at the midnight side — a near-black landing globe. The boot time
+moved to **08:00 UT** (subsolar ~60°E: ~3/4 of the landing disc lit,
+terminator on the Atlantic limb, Sq blob on screen) and the night floor rose
+**0.35 → 0.55** in both fragments so the night side stays clearly readable,
+just darker (worst-case night × relief hillshade 0.30, was 0.19). Fast
+suites stayed green (54); no test pinned either constant.
+
+**:8300 branch-preview browser pass (2026-07-15) — the remaining-before-merge
+list, all green: 28/28 checks, zero pageerror/console.error** across every
+section, real interactions throughout. Boot (t=08:00 hash-normalized, night
+quarter visible & darker than day); ECI playback (timePos advances, pose
+tracks UT at 15°/h with <1° deviation spread, world-space sun drift <0.03
+while the globe spins); relief × night floor (night pixels readable with
+relief on and off); hover under ECI (readout stays geographic — same pixel
+reads 156.2°E under eci vs 0.1°E under ecef); Seasons pose-hold (weekly
+12:00 UT steps: earth angle spread 0°, subsolar-lon spread 0.46°); studies ×
+frame interplay (all five tabs cycled under eci, CHAOS greys the iono
+toggle, back to CI clean); narrow width (420 px: no horizontal scroll, all
+controls visible). Eyeballed: default 3/4-lit landing, ECI mid-play
+world-fixed lighting, Seasons night face at the new floor, narrow layout.
 
 ### Beyond (IDEAS-only, not approved)
 

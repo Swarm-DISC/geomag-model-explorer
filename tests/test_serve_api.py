@@ -51,10 +51,16 @@ def wait_for_day(client, day, timeout=120.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         data = client.get("/api/days").json()
-        if day in data["days"]:
+        # the day is published by the export subprocess's LAST act (the
+        # atomic manifest write), so it can be listed a beat before the
+        # runner clears the job record — wait until this day's job is gone,
+        # not just until the day appears (a later queued day's job may
+        # already be running by then)
+        job = data["job"]
+        if day in data["days"] and (job is None or job.get("date") != day):
             return data
-        if data["job"] and data["job"]["state"] == "error":
-            raise AssertionError(f"job failed: {data['job']}")
+        if job and job["state"] == "error":
+            raise AssertionError(f"job failed: {job}")
         time.sleep(0.3)
     raise AssertionError(f"day {day} not published within {timeout}s")
 

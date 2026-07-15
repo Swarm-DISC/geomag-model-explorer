@@ -151,6 +151,25 @@ FAMILIES: dict[str, dict[str, str]] = {
         # no "iono": the CHAOS family ships without an ionospheric layer
         # (human decision 2026-06-12 — CHAOS-MIO exists but is skipped).
     },
+    # v2.11 (docs/v211_model_probe.json): every remaining VirES model that
+    # is a distinct, grid-evaluable field model — each one single-field by
+    # nature, so ci and chaos stay the only multi-field lenses. The
+    # -Primary/-Secondary variants are covered through their served
+    # composites (the probe shows MIO_SHA_2D / MMA_SHA_2F *are* the sums);
+    # MCO_SHA_2X ≡ CHAOS-Core, CHAOS and SwarmCI are composites of covered
+    # models. Deliberately unevaluated (UI-greyed, human decision
+    # 2026-07-01): CHAOS-MIO (the 2026-06-12 decision stands), AMPS (polar
+    # current climatology, not a global field), MLI_SHA_2E (degree 600 —
+    # far beyond the 1° pipeline grid's resolving power).
+    "mco2d": {"core": "Core = 'MCO_SHA_2D'",
+              "core-sv": "Core = 'MCO_SHA_2D'"},
+    "igrf": {"core": "Core = IGRF",
+             "core-sv": "Core = IGRF"},
+    "lcs1": {"crust": "Crust = 'LCS-1'"},
+    "mf7": {"crust": "Crust = 'MF7'"},
+    "mli2d": {"crust": "Crust = 'MLI_SHA_2D'"},
+    "mio2d": {"iono": "Ionosphere = 'MIO_SHA_2D'"},
+    "mma2f": {"magneto": "Magnetosphere = 'MMA_SHA_2F'"},
 }
 
 
@@ -161,7 +180,7 @@ class SeriesSpec:
     path key (filesystem-safe slug, never date-shaped, never 'static'); a
     model family other than CI belongs in the id by convention (…@igrf)."""
     id: str
-    kind: str                  # "annual" | "secular" | "diurnal"
+    kind: str                  # "annual" | "secular" | "diurnal" | "static"
     label: str                 # one line for the UI's series picker
     fields: tuple[str, ...]    # FIELDS keys evaluated at every epoch
     start: dt.date
@@ -244,7 +263,96 @@ SERIES: dict[str, SeriesSpec] = {
         start=dt.date(2020, 1, 1), end=dt.date(2020, 1, 2),
         step_days=0, step_minutes=STEP_MINUTES, fixed_time=dt.time(0),
         qrange={"core": 10_000_000.0}),
+    # v2.11 single-field families (docs/v211_model_probe.json). Crust models
+    # are timeless: one epoch, single-step — the "static" kind feeds the
+    # Crust study. The noon epoch matches the CI static crust's fetch date;
+    # step_days=1 only terminates SeriesSpec.epochs() (start == end).
+    "crust-static": SeriesSpec(
+        id="crust-static", kind="static",
+        label="Crustal field — static (Swarm CI MLI_SHA_2C)",
+        fields=("crust",), single_step=("crust",),
+        start=dt.date(2020, 1, 1), end=dt.date(2020, 1, 1),
+        step_days=1, fixed_time=dt.time(12)),
+    "crust-static@chaos": SeriesSpec(
+        id="crust-static@chaos", kind="static",
+        label="Crustal field — static (CHAOS-Static)",
+        fields=("crust",), family="chaos", single_step=("crust",),
+        start=dt.date(2020, 1, 1), end=dt.date(2020, 1, 1),
+        step_days=1, fixed_time=dt.time(12)),
+    "crust-static@lcs1": SeriesSpec(
+        id="crust-static@lcs1", kind="static",
+        label="Crustal field — static (LCS-1)",
+        fields=("crust",), family="lcs1", single_step=("crust",),
+        start=dt.date(2020, 1, 1), end=dt.date(2020, 1, 1),
+        step_days=1, fixed_time=dt.time(12),
+        qrange={"crust": 2_000.0}),   # surface |B| max 1561 (probe)
+    "crust-static@mf7": SeriesSpec(
+        id="crust-static@mf7", kind="static",
+        label="Crustal field — static (MF7)",
+        fields=("crust",), family="mf7", single_step=("crust",),
+        start=dt.date(2020, 1, 1), end=dt.date(2020, 1, 1),
+        step_days=1, fixed_time=dt.time(12)),   # max 1133 fits the 1500 default
+    "crust-static@mli2d": SeriesSpec(
+        id="crust-static@mli2d", kind="static",
+        label="Crustal field — static (MLI_SHA_2D)",
+        fields=("crust",), family="mli2d", single_step=("crust",),
+        start=dt.date(2020, 1, 1), end=dt.date(2020, 1, 1),
+        step_days=1, fixed_time=dt.time(12)),   # max 1022 fits the 1500 default
+    # Core models over their FULL validity (v2.11 mandate). IGRF: 5-yearly —
+    # its generations are 5-yr piecewise-linear, so yearly epochs would only
+    # interpolate; last epoch 2025-06-01 keeps the ±6-mo SV window inside
+    # the 2030-01-01 validity end. Amplitudes fit the field defaults (probe:
+    # CMB |B| max 927k, |Bdot| max 86k at 1950).
+    "core-secular@igrf": SeriesSpec(
+        id="core-secular@igrf", kind="secular",
+        label="Core field & secular variation — 5-yearly, 1900–2025 (IGRF)",
+        fields=("core", "core-sv"), family="igrf",
+        start=dt.date(1900, 6, 1), end=dt.date(2025, 6, 1),
+        step_days=0, step_years=5, fixed_time=dt.time(12),
+        # early-century CMB |Bdot| tops the 100k default (export measured
+        # max 108.9k at the 1900s epochs; the probe's 1950 sample was 86k)
+        qrange={"core-sv": 150_000.0}),
+    # MCO_SHA_2D validity 2013-11-25..2018-01-01 (probe): June-1 epochs keep
+    # every ±6-mo SV window inside it. CMB |B| max 7.67M needs the CHAOS-size
+    # storage range.
+    "core-secular@mco2d": SeriesSpec(
+        id="core-secular@mco2d", kind="secular",
+        label="Core field & secular variation — yearly, 2014–2017 (MCO_SHA_2D)",
+        fields=("core", "core-sv"), family="mco2d",
+        start=dt.date(2014, 6, 1), end=dt.date(2017, 6, 1),
+        step_days=0, step_years=1, fixed_time=dt.time(12),
+        qrange={"core": 10_000_000.0}),
+    # Time-varying single-field models mirror their field's existing series
+    # shape: the ionosphere's weekly-noon year, the magnetosphere's 15-min
+    # curated day. Amplitudes fit the field defaults (probe: 55.6 / 9.8 nT).
+    "mio-seasonal-2020@mio2d": SeriesSpec(
+        id="mio-seasonal-2020@mio2d", kind="annual",
+        label="Ionosphere through 2020 — weekly, 12:00 UT (MIO_SHA_2D)",
+        fields=("iono",), family="mio2d",
+        start=dt.date(2020, 1, 1), end=dt.date(2020, 12, 31),
+        step_days=7, fixed_time=dt.time(12)),
+    "daily-2020-01-01@mma2f": SeriesSpec(
+        id="daily-2020-01-01@mma2f", kind="diurnal",
+        label="MMA_SHA_2F on 2020-01-01 — 15-min steps",
+        fields=("magneto",), family="mma2f",
+        start=dt.date(2020, 1, 1), end=dt.date(2020, 1, 2),
+        step_days=0, step_minutes=STEP_MINUTES, fixed_time=dt.time(0)),
 }
+
+# Container-startup fetch order (deploy/entrypoint.sh): cheap first, so the
+# UI gains families early — the five one-eval statics, then the short
+# secular runs, then the 97-epoch diurnals and weekly years, with the
+# 26-epoch IGRF century (core + sv = 78 stacked evals) last. Must stay a
+# permutation of SERIES (unit-tested).
+STARTUP_SERIES_ORDER: tuple[str, ...] = (
+    "crust-static", "crust-static@chaos", "crust-static@lcs1",
+    "crust-static@mf7", "crust-static@mli2d",
+    "core-secular@mco2d",
+    "core-secular", "core-secular@chaos",
+    "daily-2020-01-01@chaos", "daily-2020-01-01@mma2f",
+    "mio-seasonal-2020", "mio-seasonal-2020@mio2d",
+    "core-secular@igrf",
+)
 
 
 def series_field(series: SeriesSpec, field_name: str) -> FieldSpec:
@@ -572,7 +680,10 @@ def query_validity() -> None:
         # info: {alias: {'expression': ..., 'validity': {'start': ..., 'end': ...}}}
         alias = spec.split("=")[0].strip()
         validity = info[alias]["validity"]
-        per_model[name] = {"start": validity["start"], "end": validity["end"]}
+        per_model[name] = {"start": validity["start"], "end": validity["end"],
+                           # served expression (degree range) — surfaced by
+                           # the model-info modal via the manifest (v2.11)
+                           "expression": info[alias].get("expression")}
     ci = {model_name(spec) for spec in FAMILIES["ci"].values()}
     out = {"start": max(per_model[n]["start"] for n in ci),
            "end": min(per_model[n]["end"] for n in ci),

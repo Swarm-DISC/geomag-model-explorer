@@ -133,7 +133,8 @@ def test_day_fields_excludes_static_and_sv():
 
 
 def test_families_shape():
-    assert set(FAMILIES) == {"ci", "chaos"}
+    assert set(FAMILIES) == {"ci", "chaos", "mco2d", "igrf", "lcs1", "mf7",
+                             "mli2d", "mio2d", "mma2f"}
     # ci is derived from FIELDS — no drift possible, but pin the contract
     assert FAMILIES["ci"] == {name: f.model for name, f in FIELDS.items()}
     for family, layers in FAMILIES.items():
@@ -146,6 +147,22 @@ def test_families_shape():
     assert "iono" not in FAMILIES["chaos"]
     assert "'CHAOS-Core'" in FAMILIES["chaos"]["core"]
     assert "'CHAOS-MMA'" in FAMILIES["chaos"]["magneto"]
+    # v2.11: every other model is single-field by nature (core models carry
+    # the derived SV layer too); ci and chaos stay the only multi-field
+    # lenses (docs/v211_model_probe.json)
+    assert set(FAMILIES["mco2d"]) == set(FAMILIES["igrf"]) == \
+        {"core", "core-sv"}
+    for fam in ("lcs1", "mf7", "mli2d"):
+        assert set(FAMILIES[fam]) == {"crust"}, fam
+    assert set(FAMILIES["mio2d"]) == {"iono"}
+    assert set(FAMILIES["mma2f"]) == {"magneto"}
+    # served but deliberately unevaluated (decisions 2026-06-12/2026-07-01):
+    # UI-greyed entries only — they must never gain an evaluation spec
+    for layers in FAMILIES.values():
+        for spec in layers.values():
+            assert "CHAOS-MIO" not in spec
+            assert "AMPS" not in spec
+            assert "MLI_SHA_2E" not in spec
 
 
 def test_core_sv_spec():
@@ -264,3 +281,79 @@ def test_series_catalog_families_consistent():
         # family-by-id convention: non-ci series carry "@<family>"
         if s.family != "ci":
             assert sid.endswith(f"@{s.family}"), sid
+
+
+# --- v2.11: all grid-evaluable VirES models ---
+
+def test_crust_static_series_shape():
+    for fam, sid in [("ci", "crust-static"), ("chaos", "crust-static@chaos"),
+                     ("lcs1", "crust-static@lcs1"),
+                     ("mf7", "crust-static@mf7"),
+                     ("mli2d", "crust-static@mli2d")]:
+        s = SERIES[sid]
+        assert s.kind == "static" and s.family == fam, sid
+        assert s.fields == ("crust",) and s.single_step == ("crust",), sid
+        # one epoch, noon, matching the CI static crust's fetch instant
+        assert s.epochs() == [dt.datetime(2020, 1, 1, 12)], sid
+
+
+def test_crust_static_qranges():
+    # probe: LCS-1 surface |B| max 1561 nT exceeds the MLI-sized 1500
+    # default; MF7 (1133) and MLI_SHA_2D (1022) fit it
+    assert series_field(SERIES["crust-static@lcs1"], "crust").qrange \
+        == 2_000.0
+    for sid in ("crust-static", "crust-static@chaos", "crust-static@mf7",
+                "crust-static@mli2d"):
+        assert series_field(SERIES[sid], "crust").qrange \
+            == FIELDS["crust"].qrange, sid
+
+
+def test_igrf_century_epochs():
+    s = SERIES["core-secular@igrf"]
+    # full IGRF span at its native 5-yr generation step; 2025-06-01 keeps
+    # the ±6-month SV window inside the 2030-01-01 validity end
+    assert s.epochs() == \
+        [dt.datetime(y, 6, 1, 12) for y in range(1900, 2026, 5)]
+    assert len(s.epochs()) == 26
+    # CMB |B| max 927k fits the core default; early-century |Bdot| does NOT
+    # fit the 100k SV default (export measured 108.9k) — series override
+    assert series_field(s, "core").qrange == FIELDS["core"].qrange
+    assert series_field(s, "core-sv").qrange == 150_000.0
+
+
+def test_mco2d_epochs_inside_validity():
+    # MCO_SHA_2D validity 2013-11-25..2018-01-01 (probe): June-1 epochs
+    # keep every ±6-month SV window inside it
+    s = SERIES["core-secular@mco2d"]
+    assert s.epochs() == \
+        [dt.datetime(y, 6, 1, 12) for y in range(2014, 2018)]
+    # probe: CMB |B| max 7.67M needs the CHAOS-size storage range
+    assert series_field(s, "core").qrange == 10_000_000.0
+    assert series_field(s, "core-sv").qrange == FIELDS["core-sv"].qrange
+
+
+def test_mio2d_mirrors_mio_seasonal():
+    a, b = SERIES["mio-seasonal-2020"], SERIES["mio-seasonal-2020@mio2d"]
+    assert b.kind == a.kind == "annual"
+    assert b.epochs() == a.epochs()
+    assert b.fields == ("iono",) and b.family == "mio2d"
+
+
+def test_mma2f_mirrors_chaos_daily():
+    s = SERIES["daily-2020-01-01@mma2f"]
+    assert s.kind == "diurnal" and s.family == "mma2f"
+    assert s.fields == ("magneto",) and s.single_step == ()
+    assert s.epochs() == day_times(dt.date(2020, 1, 1))
+
+
+def test_startup_series_order_is_permutation():
+    assert sorted(fetch.STARTUP_SERIES_ORDER) == sorted(SERIES)
+
+
+def test_single_epoch_series_fields_are_single_step():
+    """A 1-epoch series member outside single_step reaches the frontend as
+    stepped with n=1 — tile step min(floor(pos), n-2) = -1, a 404 — so the
+    catalog must never ship one (frameSource contract, web/dataset.js)."""
+    for sid, s in SERIES.items():
+        if len(s.epochs()) == 1:
+            assert set(s.fields) <= set(s.single_step), sid

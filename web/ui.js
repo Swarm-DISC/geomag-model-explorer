@@ -5,6 +5,11 @@ export const FIELD_LABELS = {
   core: 'Core', crust: 'Crust', iono: 'Ionosphere', magneto: 'Magnetosphere',
   'core-sv': 'Core dB/dt',
 };
+// Display names only — 'N'/'E'/'Up'/'F' stay the keys in state.component,
+// the c= permalink, COMPONENT_MASK and the radio values/ids (v2.12).
+export const COMPONENT_LABELS = {
+  N: 'Northward', E: 'Eastward', Up: 'Upward', F: 'Intensity',
+};
 export const R_SURFACE_M = 6371000;
 
 function shellLabel(slug, radiusM) {
@@ -80,7 +85,7 @@ export function initUI(state, manifest, hooks, timeline) {
       state.component = comp;
       hooks.applyComponent();
     });
-    label.append(rb, document.createTextNode(comp));
+    label.append(rb, document.createTextNode(COMPONENT_LABELS[comp]));
     $('component-radios').appendChild(label);
   }
 

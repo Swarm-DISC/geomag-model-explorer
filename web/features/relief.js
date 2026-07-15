@@ -7,7 +7,10 @@
 
 export function restore({ state }) {
   const p = new URLSearchParams(window.location.hash.slice(1));
+  // '1' predates the v2.12 on-default (old links must keep working);
+  // '0' is how a link expresses off now that on is the default.
   if (p.get('r') === '1') state.relief = true;
+  if (p.get('r') === '0') state.relief = false;
 }
 
 export function attach({ state, hooks }) {

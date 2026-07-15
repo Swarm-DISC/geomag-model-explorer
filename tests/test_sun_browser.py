@@ -1,8 +1,11 @@
-"""Sun feature (PLAN v2.6 step A) against a sandboxed server (:8218) with
-the flag on: the Sun checkbox appears, toggling it adds the subsolar glyph +
-terminator overlay, the overlay points at the analytic subsolar direction and
-tracks the time slider, and sun=1 round-trips through the permalink (garbage
-ignored). Flag-off (:8219, same data) shows no checkbox — exactly v1."""
+"""Sunlight feature (PLAN v2.12, superseding the v2.6 overlay) against a
+sandboxed server (:8218) with the flag on: the Sunlight checkbox appears (on
+by default), toggling shades the globe by day/night (uSunlight/uSunDir
+uniforms — the retired terminator/glyph overlay must never exist), the sun
+direction matches the analytic subsolar point and tracks the time slider,
+and the off state round-trips as sun=0 (absent = on; the pre-v2.12 sun=1
+still parses; garbage ignored). Flag-off (:8219, same data) shows no
+checkbox and never shades."""
 from __future__ import annotations
 
 import json
@@ -25,28 +28,57 @@ SEED_SERIES = "mio-seasonal-2020"
 TIMEOUT_MS = 120_000
 
 DEMO_HASH = "#f=iono&c=Up&s=surface&t=12:00&sun=1"
+MIDNIGHT_HASH = "#f=iono&c=Up&s=surface&t=00:00"
 SEASONS_HASH = (f"#tab=seasons&series={SEED_SERIES}"
                 "&f=iono&c=Up&s=surface&sun=1")
 
-# Distance between the overlay's +Z axis (rotated by its quaternion) and the
-# subsolar direction recomputed from the displayed UT in web/sun.js.
-OVERLAY_ERROR_JS = """
+# Distance between the field material's object-space uSunDir and the subsolar
+# direction recomputed from the displayed UT in web/sun.js.
+SUN_ERROR_JS = """
 async () => {
-  const g = window.geomagModelExplorer.globe.scene.getObjectByName('sun-overlay');
-  if (!g) return null;
-  const q = g.quaternion;
-  const x = 2 * (q.x * q.z + q.w * q.y);
-  const y = 2 * (q.y * q.z - q.w * q.x);
-  const z = 1 - 2 * (q.x * q.x + q.y * q.y);
+  const { globe, state, manifest } = window.geomagModelExplorer;
+  const u = globe.fieldMaterial.uniforms.uSunDir.value;
   const m = await import('./sun.js');
-  const { state, manifest } = window.geomagModelExplorer;
   const { lat, lon } = m.subsolarPoint(m.displayedUT(state, manifest));
   const D = Math.PI / 180;
-  return Math.hypot(x - Math.cos(lat * D) * Math.sin(lon * D),
-                    y - Math.sin(lat * D),
-                    z - Math.cos(lat * D) * Math.cos(lon * D));
+  return Math.hypot(u.x - Math.cos(lat * D) * Math.sin(lon * D),
+                    u.y - Math.sin(lat * D),
+                    u.z - Math.cos(lat * D) * Math.cos(lon * D));
 }
 """
+
+# uSunlight on both materials (field shell + coastline reference sphere).
+SUNLIGHT_JS = """
+() => [window.geomagModelExplorer.globe.fieldMaterial,
+       window.geomagModelExplorer.globe.coastMaterial]
+        .map((m) => m.uniforms.uSunlight.value)
+"""
+
+# Force a render and hash the full canvas (preserveDrawingBuffer is on).
+CANVAS_JS = """
+() => { window.geomagModelExplorer.renderOnce();
+        return window.geomagModelExplorer.renderer.domElement.toDataURL(); }
+"""
+
+# Mean brightness over the canvas — the night hemisphere facing the camera
+# must pull this down when sunlight is on.
+BRIGHTNESS_JS = """
+() => {
+  window.geomagModelExplorer.renderOnce();
+  const el = window.geomagModelExplorer.renderer.domElement;
+  const c = document.createElement('canvas');
+  c.width = el.width; c.height = el.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(el, 0, 0);
+  const d = ctx.getImageData(0, 0, c.width, c.height).data;
+  let sum = 0;
+  for (let i = 0; i < d.length; i += 4) sum += d[i] + d[i + 1] + d[i + 2];
+  return sum / (d.length / 4);
+}
+"""
+
+NO_OVERLAY_JS = ("() => !!window.geomagModelExplorer.globe.scene"
+                 ".getObjectByName('sun-overlay')")
 
 
 def _wait_port(port, timeout=30.0):
@@ -142,24 +174,43 @@ def test_subsolar_math(servers, watched_page):
     assert pts["series"] == "2020-01-05T12:00:00.000Z"  # UT, not host-local
 
 
-def test_sun_toggle_adds_overlay(servers, watched_page):
+def test_sunlight_toggle_shades_globe(servers, watched_page):
+    """At 00:00 UT the night hemisphere faces the default camera (lon 0):
+    Sunlight is on by default and darkens the canvas; toggling off restores
+    full brightness, and re-enabling reproduces the shaded canvas
+    bit-identically (uSunlight == 0 leaves the color path untouched). The
+    v2.6 overlay objects must never exist."""
     on, _off = servers
     page, _errors = watched_page
-    page.goto(on + "/", timeout=TIMEOUT_MS)
+    page.goto(on + "/" + MIDNIGHT_HASH, timeout=TIMEOUT_MS)
     _wait_ready(page)
-    assert not page.is_checked("#sun-toggle")
-    assert page.evaluate(
-        "() => !!window.geomagModelExplorer.globe.scene"
-        ".getObjectByName('sun-overlay')") is False
-    page.check("#sun-toggle")
-    assert page.evaluate("() => window.geomagModelExplorer.state.sun") is True
-    assert page.evaluate(OVERLAY_ERROR_JS) < 1e-3
-    page.screenshot(path=str(ARTIFACTS / "sun_overlay.png"))
+    assert page.is_checked("#sun-toggle")
+    assert page.evaluate(SUNLIGHT_JS) == [1, 1]
+    assert page.evaluate(SUN_ERROR_JS) < 1e-3
+    assert page.evaluate(NO_OVERLAY_JS) is False
+    shaded = page.evaluate(CANVAS_JS)
+    dark = page.evaluate(BRIGHTNESS_JS)
+    page.screenshot(path=str(ARTIFACTS / "sun_shading.png"))
+
     page.uncheck("#sun-toggle")
     assert page.evaluate("() => window.geomagModelExplorer.state.sun") is False
-    assert page.evaluate(
-        "() => !!window.geomagModelExplorer.globe.scene"
-        ".getObjectByName('sun-overlay')") is False
+    assert page.evaluate(SUNLIGHT_JS) == [0, 0]
+    assert dark < page.evaluate(BRIGHTNESS_JS) * 0.8
+
+    page.check("#sun-toggle")
+    assert page.evaluate(SUNLIGHT_JS) == [1, 1]
+    assert page.evaluate(CANVAS_JS) == shaded
+
+
+def test_sun_off_form(servers, watched_page):
+    """sun=0 (the v2.12 off form) restores an unlit boot."""
+    on, _off = servers
+    page, _errors = watched_page
+    page.goto(on + "/" + MIDNIGHT_HASH + "&sun=0", timeout=TIMEOUT_MS)
+    _wait_ready(page)
+    assert page.evaluate("() => window.geomagModelExplorer.state.sun") is False
+    assert not page.is_checked("#sun-toggle")
+    assert page.evaluate(SUNLIGHT_JS) == [0, 0]
 
 
 def test_sun_tracks_time_slider(servers, watched_page):
@@ -167,31 +218,31 @@ def test_sun_tracks_time_slider(servers, watched_page):
     page, _errors = watched_page
     page.goto(on + "/" + DEMO_HASH, timeout=TIMEOUT_MS)
     _wait_ready(page)
-    assert page.evaluate(OVERLAY_ERROR_JS) < 1e-3
+    assert page.evaluate(SUN_ERROR_JS) < 1e-3
     before = page.evaluate(
-        "() => window.geomagModelExplorer.globe.scene.getObjectByName('sun-overlay')"
-        ".quaternion.toArray()")
+        "() => window.geomagModelExplorer.globe.fieldMaterial"
+        ".uniforms.uSunDir.value.toArray()")
     page.locator("#time-slider").fill("0")           # 12:00 -> 00:00 UT
-    # the overlay updates from the post-render change notification: it must
-    # both move away from the noon pose and still match the analytic sun
+    # the uniform updates from the post-render change notification: it must
+    # both move away from the noon direction and still match the analytic sun
     page.wait_for_function(
         f"""async () => {{
           const before = {json.dumps(before)};
-          const err = await ({OVERLAY_ERROR_JS})();
-          const q = window.geomagModelExplorer.globe.scene
-            .getObjectByName('sun-overlay').quaternion.toArray();
+          const err = await ({SUN_ERROR_JS})();
+          const u = window.geomagModelExplorer.globe.fieldMaterial
+            .uniforms.uSunDir.value.toArray();
           return err < 1e-3 &&
-            q.some((v, i) => Math.abs(v - before[i]) > 0.1);
+            u.some((v, i) => Math.abs(v - before[i]) > 0.1);
         }}""",
         timeout=TIMEOUT_MS)
 
 
-def test_seasons_terminator_holds_clock(servers, watched_page):
+def test_seasons_sun_holds_clock(servers, watched_page):
     """PLAN v2.8: scrubbing between the weekly epochs of a fixed-time-of-day
     series must not sweep the sun through the intermediate hours. The
     displayed UT holds the series' 12:00 clock (whole-day snap), so the
-    subsolar longitude stays at the noon meridian (± equation of time), the
-    overlay tracks it, and the timeline label shows the same date."""
+    subsolar longitude stays at the noon meridian (± equation of time),
+    uSunDir tracks it, and the timeline label shows the same date."""
     on, _off = servers
     page, _errors = watched_page
     page.goto(on + "/" + SEASONS_HASH, timeout=TIMEOUT_MS)
@@ -206,7 +257,7 @@ def test_seasons_terminator_holds_clock(servers, watched_page):
               const m = await import('./sun.js');
               const ut = m.displayedUT(state, manifest);
               const {{ lon }} = m.subsolarPoint(ut);
-              const err = await ({OVERLAY_ERROR_JS})();
+              const err = await ({SUN_ERROR_JS})();
               const label = document.getElementById('time-label').textContent;
               return ut.getUTCHours() === 12 && ut.getUTCMinutes() === 0 &&
                 Math.abs(lon) < 5 &&
@@ -223,14 +274,15 @@ def test_sun_permalink_roundtrip(servers, watched_page):
     _wait_ready(page)
     assert page.evaluate("() => window.geomagModelExplorer.state.sun") is True
     assert page.is_checked("#sun-toggle")
-    assert page.evaluate(OVERLAY_ERROR_JS) < 1e-3
-    # the write-back keeps sun=1 ...
-    page.wait_for_function(
-        "() => location.hash.includes('sun=1')", timeout=TIMEOUT_MS)
-    # ... and drops it when the overlay is switched off
-    page.uncheck("#sun-toggle")
+    assert page.evaluate(SUNLIGHT_JS) == [1, 1]
+    assert page.evaluate(SUN_ERROR_JS) < 1e-3
+    # the write-back normalizes the pre-v2.12 sun=1 away (on = the default) ...
     page.wait_for_function(
         "() => !location.hash.includes('sun=')", timeout=TIMEOUT_MS)
+    # ... and writes the off form when the shading is switched off
+    page.uncheck("#sun-toggle")
+    page.wait_for_function(
+        "() => location.hash.includes('sun=0')", timeout=TIMEOUT_MS)
 
 
 def test_garbage_sun_hash_degrades(servers, watched_page):
@@ -238,8 +290,9 @@ def test_garbage_sun_hash_degrades(servers, watched_page):
     page, _errors = watched_page
     page.goto(on + "/#sun=banana", timeout=TIMEOUT_MS)
     _wait_ready(page)
-    assert page.evaluate("() => window.geomagModelExplorer.state.sun") is False
-    assert not page.is_checked("#sun-toggle")
+    # garbage degrades to the default — on, since v2.12
+    assert page.evaluate("() => window.geomagModelExplorer.state.sun") is True
+    assert page.is_checked("#sun-toggle")
 
 
 def test_flag_off_has_no_sun(servers, watched_page):
@@ -247,8 +300,6 @@ def test_flag_off_has_no_sun(servers, watched_page):
     page, _errors = watched_page
     page.goto(off + "/#sun=1", timeout=TIMEOUT_MS)
     _wait_ready(page)
+    # state.sun defaults on but is inert without the module: nothing shades
     assert page.evaluate("() => document.getElementById('sun-toggle')") is None
-    assert page.evaluate("() => window.geomagModelExplorer.state.sun") is False
-    assert page.evaluate(
-        "() => !!window.geomagModelExplorer.globe.scene"
-        ".getObjectByName('sun-overlay')") is False
+    assert page.evaluate(SUNLIGHT_JS) == [0, 0]

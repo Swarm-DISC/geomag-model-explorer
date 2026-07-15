@@ -100,6 +100,8 @@ uniform sampler2D uCoast;      // equirect coastlines, alpha = line
 uniform float uCoastMix;       // coastline overlay strength
 uniform float uOpacity;
 uniform vec3 uLightDir;        // view-space; headlight unless the sun drives it
+uniform vec3 uSunDir;          // unit subsolar direction, object space (= ECEF)
+uniform float uSunlight;       // 1 while the Sunlight toggle is on (v2.12)
 
 void main() {
   vec2 ll = lonlat(vPos);
@@ -109,6 +111,15 @@ void main() {
   vec4 coast = texture(uCoast, vec2((ll.x + 180.0) / 360.0,
                                     (ll.y +  90.0) / 180.0));
   col = mix(col, coast.rgb, coast.a * uCoastMix);
+  if (uSunlight != 0.0) {
+    // Day/night from the undisplaced sphere normal, so the same term works
+    // at every shell radius and under relief displacement; ~±5° soft
+    // terminator band; the night floor keeps field colors readable —
+    // clearly visible, just darker than the day side.
+    // uSunlight == 0 leaves col untouched — bit-identical off path.
+    float day = smoothstep(-0.09, 0.09, dot(normalize(vPos), uSunDir));
+    col *= mix(0.55, 1.0, day);
+  }
   if (uRelief != 0.0) {
     // The material is unlit, so face-on relief would be invisible: hillshade
     // from the displaced surface's screen-space derivatives, floored so the
@@ -126,6 +137,8 @@ in vec3 vPos;
 out vec4 fragColor;
 uniform sampler2D uCoast;
 uniform float uOpacity;
+uniform vec3 uSunDir;          // unit subsolar direction, object space (= ECEF)
+uniform float uSunlight;       // 1 while the Sunlight toggle is on (v2.12)
 
 void main() {
   vec3 n = normalize(vPos);
@@ -133,7 +146,14 @@ void main() {
   float lon = degrees(atan(n.x, n.z));
   vec4 coast = texture(uCoast, vec2((lon + 180.0) / 360.0,
                                     (lat +  90.0) / 180.0));
-  fragColor = vec4(coast.rgb, coast.a * uOpacity);
+  vec3 col = coast.rgb;
+  if (uSunlight != 0.0) {
+    // Same day/night term as the field fragment, so the reference sphere
+    // dims in step with an off-surface shell.
+    float day = smoothstep(-0.09, 0.09, dot(n, uSunDir));
+    col *= mix(0.55, 1.0, day);
+  }
+  fragColor = vec4(col, coast.a * uOpacity);
 }
 `;
 
@@ -150,6 +170,8 @@ export function buildFieldMaterial(lut, coast) {
     uVmax: { value: 1 },
     uRelief: { value: 0 },
     uLightDir: { value: new THREE.Vector3(0.35, 0.45, 0.85).normalize() },
+    uSunDir: { value: new THREE.Vector3(0, 0, 1) },
+    uSunlight: { value: 0 },
     uLut: { value: lut },
     uCoast: { value: coast },
     uCoastMix: { value: 1 },
@@ -173,7 +195,11 @@ export function buildCoastMaterial(coast) {
     glslVersion: THREE.GLSL3,
     vertexShader: VERTEX,
     fragmentShader: COAST_FRAGMENT,
-    uniforms: { uCoast: { value: coast }, uOpacity: { value: 1 } },
+    uniforms: {
+      uCoast: { value: coast }, uOpacity: { value: 1 },
+      uSunDir: { value: new THREE.Vector3(0, 0, 1) },
+      uSunlight: { value: 0 },
+    },
     transparent: true,
     depthWrite: false,
   });

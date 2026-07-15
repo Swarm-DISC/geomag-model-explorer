@@ -4,17 +4,25 @@ import { loadManifest, getTexture, getTextureSync, setDecodeHook, prefetch,
          cacheSize, lookup, frameSource, storageQrange } from './dataset.js';
 import { createGlobe } from './globe.js';
 import { FIELD_INDEX } from './shaders.js';
-import { initUI, fmtTime, R_SURFACE_M } from './ui.js';
+import { initUI, fmtTime, COMPONENT_LABELS, R_SURFACE_M } from './ui.js';
 
 const state = {
-  enabled: { core: false, crust: true, iono: false, magneto: false },
+  // v2.12 defaults: the full four-field sum, lit and displaced — the landing
+  // view shows everything; permalinks can still express any off state.
+  enabled: { core: true, crust: true, iono: true, magneto: true },
   component: 'Up',          // 'N' | 'E' | 'Up' | 'F'
-  shell: 'surface',         // shell slug
+  shell: 'h500',            // shell slug — 500 km altitude on initial load
   vmaxLock: null,           // nT: colorbar range frozen here; null = auto
   day: null,                // YYYY-MM-DD (manifest default)
-  pos: 0,                   // float epoch index into the active timeline
-  sun: false,               // subsolar marker + terminator (feature `sun`)
-  relief: false,            // field-displaced surface (feature `relief`)
+  tab: null,                // active study id (feature `studies`; permalink
+                            // key — lets kind-less tabs round-trip, v2.11)
+  pos: 32,                  // float epoch index into the active timeline —
+                            // boot at 08:00 UT: subsolar ~60°E puts ~3/4 of
+                            // the landing disc in daylight, terminator on the
+                            // Atlantic limb, and the Sq blob on screen
+  sun: true,                // day/night sunlight shading (feature `sun`)
+  relief: true,             // field-displaced surface (feature `relief`)
+  frame: 'ecef',            // reference frame id (feature `frame`)
   playing: false,
   speed: 4,
   dirty: true,              // render-on-demand flag
@@ -52,6 +60,13 @@ const RELIEF_RADII = 0.15;
 const FEATURE_MODULES = {
   permalink: () => import('./features/permalink.js'),
   studies: () => import('./features/studies.js'),
+  // after studies: its ⓘ button anchors to the #family-bar/#field-bar
+  // header slots that studies' attach() builds
+  modelinfo: () => import('./features/model-info.js'),
+  // before sun: frame's change listener poses the earth group that sun's
+  // listener reads for the world-space light direction (listeners run in
+  // insertion order)
+  frame: () => import('./features/frame.js'),
   sun: () => import('./features/sun.js'),
   relief: () => import('./features/relief.js'),
 };
@@ -128,10 +143,15 @@ async function main() {
   // saturates 37×). Falls back to the static default.
   function fieldVmax(field) {
     const spec = manifest.fields[field];
-    const stats = spec.cadence === 'static'
-      ? spec.stats?.[state.shell]
-      : (manifest.series?.[state.day] ?? manifest.days[state.day])
-          ?.stats?.[field]?.[state.shell];
+    // series membership outranks the static shortcut (the same rule as
+    // fieldDay/frameSource): a series' crust — CHAOS-Static, LCS-1, MF7 —
+    // must use its own stats, never the MLI static ones (v2.11)
+    const rec = manifest.series?.[state.day];
+    const stats = rec?.fields.includes(field)
+      ? rec.stats?.[field]?.[state.shell]
+      : spec.cadence === 'static'
+        ? spec.stats?.[state.shell]
+        : manifest.days[state.day]?.stats?.[field]?.[state.shell];
     return stats?.p99 ?? spec.vmax_nT;
   }
 
@@ -279,17 +299,22 @@ async function main() {
 
   async function pickDay(day) {
     if (day in manifest.days) { ui.setDay(day); return; }
-    // The day-fetch POST is gated by the foundry token: prompted once, cached in localStorage
-    // (never embedded in the page), and sent as the X-Foundry-Token header on the mutating fetch.
-    let token = localStorage.getItem('foundry_token');
-    if (!token) {
-      token = window.prompt('Foundry API token (stored locally for gated day fetches):');
-      if (!token) { ui.setDay(state.day); return; }
-      token = token.trim();
-      localStorage.setItem('foundry_token', token);
+    // The day-fetch POST is gated by the foundry token: cached in localStorage (never embedded
+    // in the page) and sent as the X-Foundry-Token header only when already cached — never
+    // prompted proactively. A 401 clears the cache, prompts once, and retries once.
+    const post = (token) => fetch(`./api/days/${encodeURIComponent(day)}`,
+                                  { method: 'POST',
+                                    headers: token ? { 'X-Foundry-Token': token } : {} });
+    let resp = await post(localStorage.getItem('foundry_token') || '');
+    if (resp.status === 401) {
+      localStorage.removeItem('foundry_token');
+      const token = (window.prompt(
+        'Foundry API token (stored locally for gated day fetches):') || '').trim();
+      if (token) {
+        localStorage.setItem('foundry_token', token);
+        resp = await post(token);
+      }
     }
-    const resp = await fetch(`./api/days/${encodeURIComponent(day)}`,
-                             { method: 'POST', headers: { 'X-Foundry-Token': token } });
     const body = await resp.json().catch(() => ({}));
     ui.setDay(state.day);              // stay on the current day meanwhile
     if (resp.status === 401) {
@@ -356,7 +381,10 @@ async function main() {
     const hit = raycaster.intersectObject(globe.shell, false)[0];
     const seq = ++hoverSeq;
     if (!hit) { readoutEl.hidden = true; return; }
-    const p = hit.point.clone().normalize();
+    // World hit -> Earth-fixed lat/lon: undo the reference-frame pose
+    // (identity in ECEF) so the readout stays geographic under rotation.
+    const p = hit.point.clone()
+      .applyQuaternion(globe.earth.quaternion.clone().invert()).normalize();
     const lat = THREE.MathUtils.radToDeg(Math.asin(
       Math.min(1, Math.max(-1, p.y))));
     const lon = THREE.MathUtils.radToDeg(Math.atan2(p.x, p.z));
@@ -384,7 +412,7 @@ async function main() {
     readoutEl.textContent =
       `${fmt(Math.abs(lat))}°${lat >= 0 ? 'N' : 'S'}, ` +
       `${fmt(Math.abs(lon))}°${lon >= 0 ? 'E' : 'W'} — ` +
-      `${state.component} ${fmt(value)} ${displayUnits()}`;
+      `${COMPONENT_LABELS[state.component]} ${fmt(value)} ${displayUnits()}`;
     readoutEl.hidden = false;
   }
   globe.renderer.domElement.addEventListener('pointermove', (e) => {
@@ -400,12 +428,16 @@ async function main() {
     const dtMs = now - last;
     last = now;
     if (state.playing) {
-      // speed 1 sweeps the whole timeline in ~2 minutes of wall clock
+      // speed 1 sweeps the whole timeline in ~2 minutes of wall clock;
+      // a single-epoch timeline (static series, v2.11) has nothing to
+      // sweep — advancing would divide by a zero span (NaN pos)
       const span = timeline.nEpochs - 1;
-      state.pos = (state.pos + dtMs * (span / timeline.sweepMs) * state.speed) % span;
-      ui.onTimeAdvance();
-      advancePlayback();
-      prefetch(state);
+      if (span > 0) {
+        state.pos = (state.pos + dtMs * (span / timeline.sweepMs) * state.speed) % span;
+        ui.onTimeAdvance();
+        advancePlayback();
+        prefetch(state);
+      }
     }
     if (state.dirty) {
       state.dirty = false;

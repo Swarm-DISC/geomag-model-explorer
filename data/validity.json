@@ -4,32 +4,74 @@
   "per_model": {
     "CHAOS-Core": {
       "start": "1997-02-07T05:23:17.067838Z",
-      "end": "2026-08-08T08:23:39.372002Z"
+      "end": "2027-02-06T17:23:46.806719Z",
+      "expression": "'CHAOS-Core'(max_degree=20,min_degree=1)"
     },
     "CHAOS-MMA": {
       "start": "2000-01-01T00:00:00Z",
-      "end": "2026-06-12T21:00:00Z"
+      "end": "2026-07-01T22:30:00Z",
+      "expression": "'CHAOS-MMA-Primary'(max_degree=2,min_degree=1) + 'CHAOS-MMA-Secondary'(max_degree=2,min_degree=1)"
     },
     "CHAOS-Static": {
       "start": "0001-01-01T00:00:00Z",
-      "end": "4000-01-01T00:00:00Z"
+      "end": "4000-01-01T00:00:00Z",
+      "expression": "'CHAOS-Static'(max_degree=185,min_degree=21)"
+    },
+    "IGRF": {
+      "start": "1900-01-01T00:00:00Z",
+      "end": "2030-01-01T00:00:00Z",
+      "expression": "IGRF(max_degree=13,min_degree=1)"
+    },
+    "LCS-1": {
+      "start": "0001-01-01T00:00:00Z",
+      "end": "4000-01-01T00:00:00Z",
+      "expression": "'LCS-1'(max_degree=185,min_degree=1)"
     },
     "MCO_SHA_2C": {
       "start": "2013-11-24T18:34:03.360004Z",
-      "end": "2025-01-01T00:00:00Z"
+      "end": "2025-01-01T00:00:00Z",
+      "expression": "MCO_SHA_2C(max_degree=18,min_degree=1)"
+    },
+    "MCO_SHA_2D": {
+      "start": "2013-11-25T12:00:00.000003Z",
+      "end": "2018-01-01T00:00:00Z",
+      "expression": "MCO_SHA_2D(max_degree=20,min_degree=1)"
+    },
+    "MF7": {
+      "start": "0001-01-01T00:00:00Z",
+      "end": "4000-01-01T00:00:00Z",
+      "expression": "MF7(max_degree=133,min_degree=16)"
     },
     "MIO_SHA_2C": {
       "start": "0001-01-01T00:00:00Z",
-      "end": "4000-01-01T00:00:00Z"
+      "end": "4000-01-01T00:00:00Z",
+      "expression": "'MIO_SHA_2C-Primary'(max_degree=60,min_degree=1) + 'MIO_SHA_2C-Secondary'(max_degree=60,min_degree=1)"
+    },
+    "MIO_SHA_2D": {
+      "start": "0001-01-01T00:00:00Z",
+      "end": "4000-01-01T00:00:00Z",
+      "expression": "'MIO_SHA_2D-Primary'(max_degree=60,min_degree=1) + 'MIO_SHA_2D-Secondary'(max_degree=60,min_degree=1)"
     },
     "MLI_SHA_2C": {
       "start": "0001-01-01T00:00:00Z",
-      "end": "4000-01-01T00:00:00Z"
+      "end": "4000-01-01T00:00:00Z",
+      "expression": "MLI_SHA_2C(max_degree=120,min_degree=16)"
+    },
+    "MLI_SHA_2D": {
+      "start": "0001-01-01T00:00:00Z",
+      "end": "4000-01-01T00:00:00Z",
+      "expression": "MLI_SHA_2D(max_degree=133,min_degree=16)"
     },
     "MMA_SHA_2C": {
       "start": "2013-11-25T03:00:00Z",
-      "end": "2023-11-30T21:00:00Z"
+      "end": "2023-11-30T21:00:00Z",
+      "expression": "'MMA_SHA_2C-Primary'(max_degree=3,min_degree=1) + 'MMA_SHA_2C-Secondary'(max_degree=3,min_degree=1)"
+    },
+    "MMA_SHA_2F": {
+      "start": "2013-11-25T11:15:00Z",
+      "end": "2026-06-27T21:45:00Z",
+      "expression": "'MMA_SHA_2F-Primary'(max_degree=1,min_degree=1) + 'MMA_SHA_2F-Secondary'(max_degree=1,min_degree=1)"
     }
   },
-  "queried_at": "2026-06-12T20:05:32.591505+00:00"
+  "queried_at": "2026-07-01T21:10:12.565200+00:00"
 }

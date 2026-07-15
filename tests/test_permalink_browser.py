@@ -119,14 +119,18 @@ def test_interaction_updates_hash(servers, watched_page):
     page, _errors = watched_page
     page.goto(on + "/", timeout=TIMEOUT_MS)
     _wait_ready(page)
-    # the booted default state gets written to the hash (debounced)
+    # the booted default state gets written to the hash (debounced):
+    # all four fields on since v2.12, sun/relief/frame absent (= defaults)
     page.wait_for_function(
-        "() => location.hash.includes('f=crust')", timeout=TIMEOUT_MS)
-    assert f"day={SEED_DAY}" in page.evaluate("() => location.hash")
-    page.check("#toggle-iono")
+        "() => location.hash.includes('f=core,crust,iono,magneto')",
+        timeout=TIMEOUT_MS)
+    hash_ = page.evaluate("() => location.hash")
+    assert f"day={SEED_DAY}" in hash_
+    assert "sun=" not in hash_ and "r=" not in hash_ and "frame=" not in hash_
+    page.uncheck("#toggle-iono")
     page.check("#comp-F")
     page.wait_for_function(
-        "() => location.hash.includes('f=crust,iono') && "
+        "() => location.hash.includes('f=core,crust,magneto') && "
         "location.hash.includes('c=F')", timeout=TIMEOUT_MS)
 
 
@@ -160,7 +164,7 @@ def test_garbage_hash_degrades_to_defaults(servers, watched_page):
     assert state["day"] == SEED_DAY          # manifest default
     assert state["pos"] == 0
     assert state["component"] == "Up"
-    assert state["shell"] == "surface"
+    assert state["shell"] == "h500"
     assert state["enabled"]["crust"] is True
     assert state["vmaxLock"] is None
     assert page.get_attribute("#colorbar-lock", "aria-pressed") == "false"
@@ -175,9 +179,9 @@ def test_flag_off_is_v1_behavior(servers, watched_page):
     _wait_ready(page)
     # hash ignored, module never fetched, hash never written back
     state = page.evaluate("() => window.geomagModelExplorer.state")
-    assert state["component"] == "Up" and state["shell"] == "surface"
+    assert state["component"] == "Up" and state["shell"] == "h500"
     assert page.evaluate("() => window.geomagModelExplorer.features") == {}
     assert not [u for u in requests if "features/permalink" in u]
-    page.check("#toggle-iono")
+    page.uncheck("#toggle-iono")             # on by default since v2.12
     page.wait_for_timeout(800)               # > debounce, were it running
     assert page.evaluate("() => location.hash") == DEMO_HASH

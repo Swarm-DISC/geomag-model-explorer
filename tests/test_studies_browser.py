@@ -1,8 +1,8 @@
-"""Studies feature (PLAN v2.3) against a sandboxed server (:8216) with the
-flag on: the tab strip appears, the Seasons tab plays the annual series
-(timeline swap, series picker, iono defaults), permalinks round-trip via
-tab=/series=/e=, and garbage degrades. Flag-off (:8217, same data) shows no
-tab strip — exactly v1."""
+"""Studies feature (PLAN v2.3/v2.10) against a sandboxed server (:8216) with
+the flag on: the "Field to explore" dropdown appears, the Ionosphere study
+plays the annual series (timeline swap, series picker, iono defaults),
+permalinks round-trip via tab=/series=/e=, and garbage degrades. Flag-off
+(:8217, same data) shows no field dropdown — exactly v1."""
 from __future__ import annotations
 
 import json
@@ -98,8 +98,11 @@ def test_tab_strip_defaults_to_daily(servers, watched_page):
     page, _errors = watched_page
     page.goto(on + "/", timeout=TIMEOUT_MS)
     _wait_ready(page)
-    assert page.get_attribute("#tab-daily", "aria-selected") == "true"
-    assert page.get_attribute("#tab-seasons", "aria-selected") == "false"
+    # the field dropdown holds the v1 lineup and defaults to Daily
+    assert page.eval_on_selector_all(
+        "#field-select option", "os => os.map(o => o.value)") \
+        == ["daily", "seasons"]
+    assert page.input_value("#field-select") == "daily"
     assert page.is_visible("#date-picker")
     assert page.is_hidden("#series-select")
     # the Daily timeline is untouched: 1440 one-minute ticks
@@ -111,8 +114,8 @@ def test_seasons_tab_plays_the_series(servers, watched_page):
     page, _errors = watched_page
     page.goto(on + "/", timeout=TIMEOUT_MS)
     _wait_ready(page)
-    page.click("#tab-seasons")
-    # tab defaults: iono on, the series becomes the day, slider ticks in days
+    page.select_option("#field-select", "seasons")
+    # study defaults: iono on, the series becomes the day, slider ticks in days
     assert page.evaluate("() => window.geomagModelExplorer.state.day") == SERIES_ID
     assert page.is_checked("#toggle-iono")
     assert not page.is_checked("#toggle-crust")
@@ -131,7 +134,7 @@ def test_seasons_tab_plays_the_series(servers, watched_page):
         "() => Math.abs(window.geomagModelExplorer.timePos() - 26) < 1e-6",
         timeout=TIMEOUT_MS)
     # back to Daily: the v1 transport returns and the gate lifts
-    page.click("#tab-daily")
+    page.select_option("#field-select", "daily")
     assert page.evaluate("() => window.geomagModelExplorer.state.day") == SEED_DAY
     assert page.get_attribute("#time-slider", "max") == "1440"
     assert page.is_visible("#date-picker")
@@ -168,7 +171,7 @@ def test_seasons_permalink_roundtrip(servers, watched_page):
                                 **{f: False for f in state["enabled"]
                                    if f not in ("core", "crust",
                                                 "iono", "magneto")}}
-    assert page.get_attribute("#tab-seasons", "aria-selected") == "true"
+    assert page.input_value("#field-select") == "seasons"
     assert page.text_content("#time-label") == "2020-07-01"
     # the write-back keeps the series keys (and drops day=/t=)
     page.wait_for_function(
@@ -177,7 +180,7 @@ def test_seasons_permalink_roundtrip(servers, watched_page):
         "location.hash.includes('e=2020-07-01T12:00') && "
         "!location.hash.includes('day=')", timeout=TIMEOUT_MS)
     # switching to Daily swaps the hash back to v1 keys
-    page.click("#tab-daily")
+    page.select_option("#field-select", "daily")
     page.wait_for_function(
         f"() => location.hash.includes('day={SEED_DAY}') && "
         "!location.hash.includes('series=')", timeout=TIMEOUT_MS)
@@ -191,15 +194,15 @@ def test_garbage_series_hash_degrades(servers, watched_page):
     state = page.evaluate("() => window.geomagModelExplorer.state")
     assert state["day"] == SEED_DAY
     assert state["pos"] == 0
-    assert page.get_attribute("#tab-daily", "aria-selected") == "true"
+    assert page.input_value("#field-select") == "daily"
 
 
-def test_flag_off_has_no_tabs(servers, watched_page):
+def test_flag_off_has_no_field_dropdown(servers, watched_page):
     _on, off = servers
     page, _errors = watched_page
     page.goto(off + "/", timeout=TIMEOUT_MS)
     _wait_ready(page)
-    assert page.evaluate("() => document.getElementById('study-tabs')") is None
+    assert page.evaluate("() => document.getElementById('field-select')") is None
     assert page.evaluate("() => document.getElementById('series-select')") \
         is None
     assert page.evaluate("() => window.geomagModelExplorer.state.day") == SEED_DAY

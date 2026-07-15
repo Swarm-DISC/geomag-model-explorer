@@ -58,7 +58,10 @@ features the tool wants to talk about (Kursk, Bangui, South Atlantic
 Anomaly).
 
 **1.4 Reference-frame switch: ECEF / ECI / sun-fixed (M).** *(generalized
-2026-06-12 from the original "follow the sun" mode)* A camera-or-globe
+2026-06-12 from the original "follow the sun" mode; ECEF/ECI subset promoted
+to PLAN v2.12 on 2026-07-08 as a plain global toggle — sun-fixed remains the
+candidate follow-on, and the FRAMES table in `web/features/frame.js` is built
+for it)* A camera-or-globe
 rotation mode, surfaced as a three-way reference-frame switch rather than a
 bare "spin" toggle:
 
@@ -260,7 +263,8 @@ terminator on → storm-day MMA with the Dst trace. Prior art: VirES's
 embedded tutorial, NCEI's story map. This converts the feature set into the
 *understanding* the project aims for, and it's mostly writing, not code.
 
-**6.2 Model-caveat panel (S).** One honest paragraph per source, surfaced
+**6.2 Model-caveat panel (S). ✅ Shipped v2.11** (flag `modelinfo`,
+`web/features/model-info.js`): One honest paragraph per source, surfaced
 from an "ⓘ": MIO is a quiet-time climatology (no storms, no eclipse
 signatures — the 2017-08-21 eclipse bookmark demonstrates the gap), MMA is
 degree ≤ 3 (no substorm structure, no auroral electrojets), MLI is truncated

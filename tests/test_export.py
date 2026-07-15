@@ -152,10 +152,11 @@ def test_export_series_end_to_end(sandbox):
     export.export_series(sid)
 
     manifest = json.loads(export.MANIFEST_JSON.read_text())
-    assert manifest["version"] == 3
+    assert manifest["version"] == 4
     rec = manifest["series"][sid]
     assert rec["kind"] == "annual"
     assert rec["family"] == "ci"
+    assert rec["models"] == {"iono": "MIO_SHA_2C"}    # v4
     assert rec["single_step"] == []
     assert rec["fields"] == ["iono"]
     assert len(rec["epochs"]) == 53
@@ -214,6 +215,7 @@ def test_manifest_validity_passthrough(sandbox):
     export.write_manifest()
     manifest = json.loads(export.MANIFEST_JSON.read_text())
     assert manifest["validity"]["start"].startswith("2013-11-25")
+    assert manifest["models"] is None      # no per_model block -> absent
 
 
 # --- v2.9: units key, family + single-step series ---
@@ -253,3 +255,61 @@ def test_export_single_step_series_end_to_end(sandbox):
     export.series_tile_path("core", "h1500", sid, 0).unlink()
     export.write_manifest()
     assert sid not in json.loads(export.MANIFEST_JSON.read_text())["series"]
+
+
+# --- v2.11: manifest v4 model metadata + the static series kind ---
+
+def test_field_records_carry_model_and_sv(sandbox):
+    export.write_manifest()
+    fields = json.loads(export.MANIFEST_JSON.read_text())["fields"]
+    assert fields["core"]["model"] == "MCO_SHA_2C"
+    assert fields["crust"]["model"] == "MLI_SHA_2C"
+    assert fields["core-sv"]["model"] == "MCO_SHA_2C"
+    assert fields["core-sv"]["sv"] is True
+    assert all(fields[n]["sv"] is False
+               for n in ("core", "crust", "iono", "magneto"))
+
+
+def test_manifest_models_passthrough(sandbox):
+    export.VALIDITY_PATH.write_text(json.dumps(
+        {"start": "2013-11-25T03:00:00Z", "end": "2023-11-30T21:00:00Z",
+         "per_model": {"IGRF": {
+             "start": "1900-01-01T00:00:00Z", "end": "2030-01-01T00:00:00Z",
+             "expression": "IGRF(max_degree=13,min_degree=1)"}}}))
+    export.write_manifest()
+    models = json.loads(export.MANIFEST_JSON.read_text())["models"]
+    assert models["IGRF"]["expression"] == "IGRF(max_degree=13,min_degree=1)"
+    assert models["IGRF"]["start"].startswith("1900")
+
+
+def test_series_record_without_models_stays_published(sandbox):
+    """Additivity: records exported before v4 lack the models key — they
+    must stay listed (completeness is tiles-only)."""
+    rng = np.random.default_rng(15)
+    sid = "mio-seasonal-2020"
+    synth_series(sid, rng)
+    export.export_series(sid)
+    manifest = json.loads(export.MANIFEST_JSON.read_text())
+    del manifest["series"][sid]["models"]
+    export.MANIFEST_JSON.write_text(json.dumps(manifest))
+    export.write_manifest()
+    rec = json.loads(export.MANIFEST_JSON.read_text())["series"][sid]
+    assert "models" not in rec             # preserved, not regenerated
+
+
+def test_export_static_series_end_to_end(sandbox):
+    rng = np.random.default_rng(16)
+    sid = "crust-static@lcs1"
+    synth_series(sid, rng)
+    export.export_series(sid)
+    rec = json.loads(export.MANIFEST_JSON.read_text())["series"][sid]
+    assert rec["kind"] == "static"
+    assert rec["family"] == "lcs1"
+    assert rec["models"] == {"crust": "LCS-1"}
+    assert rec["single_step"] == ["crust"]
+    assert rec["epochs"] == ["2020-01-01T12:00:00"]
+    assert rec["qrange_nT"]["crust"] == 2_000.0    # probe-sized override
+    tile = export.series_tile_path("crust", "surface", sid, 0)
+    assert tile.name == "t000.i16"
+    assert tile.exists()
+    assert not export.series_tile_path("crust", "surface", sid, 1).exists()

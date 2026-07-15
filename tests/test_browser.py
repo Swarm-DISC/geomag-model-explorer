@@ -102,14 +102,15 @@ def test_field_toggles_change_pixels(app_page):
     days = page.evaluate("() => Object.keys(window.geomagModelExplorer.manifest.days)")
     if not days:
         pytest.skip("no full day cached yet (Phase 2 pending)")
+    # all four fields are on by default since v2.12: drop each in turn
     baseline = _hash_canvas(page)
     for field in ("core", "iono", "magneto"):
-        page.check(f"#toggle-{field}")
+        page.uncheck(f"#toggle-{field}")
         page.wait_for_timeout(500)
         page.evaluate("window.geomagModelExplorer.renderOnce()")
         h = _hash_canvas(page)
-        assert h != baseline, f"enabling {field} did not change the canvas"
-        page.uncheck(f"#toggle-{field}")
+        assert h != baseline, f"disabling {field} did not change the canvas"
+        page.check(f"#toggle-{field}")
         page.wait_for_timeout(300)
 
 
@@ -171,7 +172,8 @@ def test_colorbar_lock(app_page):
     if not days:
         pytest.skip("no full day cached yet")
     page.check("#toggle-core")
-    page.uncheck("#toggle-crust")
+    for field in ("crust", "iono", "magneto"):   # core-only scale (all four
+        page.uncheck(f"#toggle-{field}")         # default on since v2.12)
     page.wait_for_timeout(500)
     surface_label = page.text_content("#colorbar-max")
     page.click("#colorbar-lock")
@@ -265,7 +267,7 @@ def test_hover_readout(app_page):
     page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
     page.wait_for_selector("#readout:not([hidden])", timeout=TIMEOUT_MS)
     text = page.eval_on_selector("#readout", "el => el.textContent")
-    assert "nT" in text and "Up" in text
+    assert "nT" in text and "Upward" in text
     assert "°" in text
     # hovering off the globe hides it
     page.mouse.move(box["x"] + 5, box["y"] + 5)
@@ -281,6 +283,9 @@ def test_api_days(page):
     assert isinstance(data["days"], list)
 
 
+@pytest.mark.skip(reason="the /foundry/geomag-model-explorer portal route was removed; a "
+                         "restored route would also need Playwright http_credentials for "
+                         "the vanaheim basic auth")
 def test_portal_prefix(page):
     page.set_viewport_size(VIEWPORT)
     errors = _collect_errors(page)

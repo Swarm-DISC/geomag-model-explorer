@@ -2,8 +2,9 @@
 # Runs the full gate INCLUDING the infra-identifier scrub; the denylist is supplied as the
 # Forgejo Actions secret HEIMDALL_DENYLIST (safe to store on the internal host).
 #
-# NB: requires a registered Forgejo Actions runner. If none exists, the gate is instead run by
-# the workstation `heimdall-gate.timer`, which posts the same `heimdall-gate` commit status.
+# NB: requires a registered Forgejo Actions runner. If none exists, this workflow never runs and
+# no `heimdall-gate` status is posted internally (there is no fallback timer); internal protection
+# is then the pre-push hook, with community PRs gated by the public-side workflow (RULES §3).
 name: heimdall gate
 on:
   pull_request:

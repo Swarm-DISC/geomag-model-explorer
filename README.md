@@ -1,15 +1,19 @@
 # geomag-model-explorer
 
 Browser-based interactive 3D visualization of Earth's geomagnetic field —
-core, crust, ionosphere and magnetosphere, from the Swarm Level-2
+core, crust, ionosphere and magnetosphere, primarily from the Swarm Level-2
 **Comprehensive Inversion (CI) model chain** (MCO_SHA_2C, MLI_SHA_2C,
-MIO_SHA_2C, MMA_SHA_2C), evaluated via [VirES](https://vires.services)
-and rendered on a three.js globe.
+MIO_SHA_2C, MMA_SHA_2C) plus **every other grid-evaluable model VirES
+serves** (CHAOS, IGRF, MCO/MLI/MIO_SHA_2D, MMA_SHA_2F, LCS-1, MF7),
+evaluated via [VirES](https://vires.services) and rendered on a three.js
+globe.
 
 ![the app](docs/screenshot.png)
 
-- **Field toggles** — any subset of the four contributions, summed on the GPU.
-- **Component picker** — N / E / Up (= −C) / F.
+- **Field toggles** — any subset of the four contributions, summed on the
+  GPU; all four on by default (v2.12).
+- **Component picker** — Northward / Eastward / Upward (= −C) /
+  Intensity (`c=N|E|Up|F` in permalinks).
 - **Shell slider** — discrete precomputed radii from the core–mantle boundary
   (−2891 km) through 500 km mantle steps to the surface, then a unified
   0–1500 km altitude ladder at 100 km steps shared by every model, so any
@@ -32,17 +36,27 @@ and rendered on a three.js globe.
   are disabled on this tab). Demo:
   `/#tab=seasons&series=mio-seasonal-2020&e=2020-07-01T12:00&f=iono&c=Up&s=surface`
   (feature-flagged: `studies`).
-- **Sun overlay** — subsolar glyph + day/night terminator computed from the
-  displayed UT, so playback reads as "the ionospheric dynamo follows the
-  Sun". On a fixed-time-of-day series the terminator holds the series'
-  clock while the date steps, instead of spinning through the days between
-  epochs. Demos: `/#f=iono&c=Up&s=surface&t=12:00&sun=1`,
-  `/#tab=seasons&series=mio-seasonal-2020&f=iono&c=Up&s=surface&sun=1`
+- **Sunlight** — day/night illumination of the globe surface from the
+  displayed UT (on by default; the v2.6 terminator ring + subsolar glyph
+  are retired — the terminator is now a lighting boundary), so playback
+  reads as "the ionospheric dynamo follows the Sun". On a fixed-time-of-day
+  series the shading holds the series' clock while the date steps, instead
+  of spinning through the days between epochs. `sun=0` turns it off in a
+  link. Demos: `/#f=iono&c=Up&s=surface&t=12:00`,
+  `/#tab=seasons&series=mio-seasonal-2020&f=iono&c=Up&s=surface`
   (feature-flagged: `sun`).
 - **Relief mode** — the displayed scalar displaces the shell radially
   (signed: dents where negative; fixed exaggeration tied to the colorbar
-  range) with a hillshade that the sun overlay lights when both are on.
-  Demo: `/#f=crust&c=Up&s=surface&r=1` (feature-flagged: `relief`).
+  range) with a hillshade that sunlight lights when both are on (both are,
+  by default; `r=0` turns relief off in a link).
+  Demo: `/#f=crust&c=Up&s=surface&sun=0` (feature-flagged: `relief`).
+- **Reference frame** — an ECEF | ECI switch (v2.12; IDEAS §1.4 subset):
+  ECEF is Earth-fixed (the globe stands still); ECI rotates the globe about
+  its polar axis at the mean-solar 15°/hr from the displayed UT, so playing
+  a day shows the Earth spinning eastward under a sun that holds still —
+  the diurnal cycle IS rotation under the Sun. Demo:
+  `/#day=2020-01-01&t=00:00&f=iono&c=Up&s=h100&frame=eci` (press play)
+  (feature-flagged: `frame`).
 - **Model families** — a page-level *Model series* selector (Swarm CI /
   CHAOS) over per-source tabs: *Combined models* (the v1 view; under CHAOS
   it plays a curated day at 15-min cadence), *Core* with a **B ↔ dB/dt**
@@ -55,6 +69,23 @@ and rendered on a three.js globe.
   `/#family=chaos&tab=daily&series=daily-2020-01-01@chaos&e=2020-01-01T12:00&f=core,crust,magneto&c=Up&s=h300`,
   `/#tab=core&series=core-secular@chaos&f=core-sv&c=Up&s=cmb`
   (feature-flagged: `families`).
+- **All VirES models** — the "Field to explore" dropdown spans All / Core /
+  Crust / Ionosphere / Magnetosphere, and the Model dropdown covers every
+  grid-evaluable model VirES serves as single-field entries: MCO_SHA_2D and
+  IGRF on Core (IGRF over its **full 1900–2025 range**, 5-yearly — watch a
+  century of secular variation), LCS-1 / MF7 / MLI_SHA_2D on Crust
+  (timeless static snapshots), MIO_SHA_2D on Ionosphere (seasonal),
+  MMA_SHA_2F on Magnetosphere (15-min curated day). Served-but-unevaluated
+  models (CHAOS-MIO, AMPS, MLI_SHA_2E) stay visible, greyed out with the
+  reason. Demos:
+  `/#tab=core&series=core-secular@igrf&e=1950-06-01T12:00&f=core-sv&c=Up&s=cmb`,
+  `/#tab=crust&series=crust-static@lcs1&f=crust&c=Up&s=surface`,
+  `/#tab=magneto&series=daily-2020-01-01@mma2f&f=magneto&c=Up&s=h500`.
+- **Model info ⓘ** — a modal naming the served model behind each on-screen
+  layer: degree range and validity (straight from VirES), grid/cadence and
+  storage range, one honest caveat paragraph per model, and the list of
+  what VirES serves that the app deliberately does not evaluate
+  (feature-flagged: `modelinfo`).
 
 ## Layout
 
@@ -111,5 +142,5 @@ Portal wiring (nginx at `/foundry/geomag-model-explorer/`): `deploy/PORTAL_HANDO
 ## Attribution
 
 Field models: ESA Swarm Level-2 Comprehensive Inversion products
-(DTU Space, IPGP et al.), served by VirES for Swarm. Coastlines: Natural
+(DTU Space et al.), served by VirES for Swarm. Coastlines: Natural
 Earth (public domain). Colormap: `nio` from chaosmagpy.

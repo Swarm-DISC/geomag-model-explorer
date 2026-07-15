@@ -90,7 +90,7 @@ else
     for t in $DENY; do
       git log -S"$t" --oneline -- . 2>/dev/null | grep -q . && { note "history contains: $t"; hist=1; }
     done
-    [ $hist = 1 ] && bad "internal identifiers in git history (use history=snapshot, or scrub+graduate)" \
+    [ $hist = 1 ] && bad "internal identifiers in git history (use history=mirror, which publishes only the tree)" \
                   || pass "no internal identifiers in history"
   fi
 fi

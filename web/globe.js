@@ -19,17 +19,24 @@ export function createGlobe(container, lut, coast) {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 50);
   camera.position.set(0, 0.6, 2.8);
 
+  // Everything Earth-fixed lives in one group, so a reference frame (feature
+  // `frame`, v2.12) poses the whole Earth from a single quaternion. Identity
+  // unless that feature rotates it.
+  const earth = new THREE.Group();
+  earth.name = 'earth';
+  scene.add(earth);
+
   const fieldMaterial = buildFieldMaterial(lut, coast);
   const shell = new THREE.Mesh(new THREE.SphereGeometry(1, 128, 64),
                                fieldMaterial);
   shell.renderOrder = 1;           // after the reference sphere
-  scene.add(shell);
+  earth.add(shell);
 
   const coastMaterial = buildCoastMaterial(coast);
   const reference = new THREE.Mesh(new THREE.SphereGeometry(1, 128, 64),
                                    coastMaterial);
   reference.visible = false;       // only shown when the shell is off-surface
-  scene.add(reference);
+  earth.add(reference);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = false;  // render-on-demand without a damping loop
@@ -77,7 +84,8 @@ export function createGlobe(container, lut, coast) {
   setShell(1);
 
   return {
-    renderer, scene, camera, controls, fieldMaterial, shell,
+    renderer, scene, camera, controls, fieldMaterial, coastMaterial, shell,
+    earth,
     setShell, setReliefMesh, resize,
     render: () => renderer.render(scene, camera),
   };

@@ -15,18 +15,26 @@
 //      families-off deploy never lands a yearly timeline on the Daily tab))
 //   (+ &family=<id> while the model-series lens ≠ ci — v2.9; a series link
 //      carries its own family, which wins over this key)
-//   (+ &sun=1 while the sun overlay is on — restored by features/sun.js,
-//      so the key only round-trips when that flag is on)
-//   (+ &r=1 while relief mode is on — restored by features/relief.js, same
-//      flag-gating)
+//   (+ &sun=0 while sunlight shading is off — restored by features/sun.js,
+//      so the key only round-trips when that flag is on; absent = on, the
+//      v2.12 default; the pre-v2.12 explicit sun=1 still parses)
+//   (+ &r=0 while relief mode is off — restored by features/relief.js, same
+//      flag-gating and the same absent-=-on / r=1-still-parses contract)
+//   (+ &frame=<id> while the reference frame ≠ ecef — restored by
+//      features/frame.js, same flag-gating; absent = ecef, so pre-v2.12
+//      links stay Earth-fixed)
 
 const DEBOUNCE_MS = 300;
 
 // The study tab a series kind lands on (mirrors features/studies.js), and
-// the feature flag that kind needs before a link to it is honored.
-const TAB_OF_KIND = { annual: 'seasons', secular: 'core', diurnal: 'daily' };
+// the feature flag that kind needs before a link to it is honored. Kind-less
+// tabs (All, Magnetosphere) share the diurnal/day data, so the explicit
+// tab= key (state.tab, validated by studies.js against its TABS) is what
+// disambiguates them on restore (v2.11).
+const TAB_OF_KIND = { annual: 'seasons', secular: 'core', diurnal: 'daily',
+                      static: 'crust' };
 const KIND_FLAG = { annual: 'studies', secular: 'families',
-                    diurnal: 'families' };
+                    diurnal: 'families', static: 'families' };
 
 let pendingDay = null;       // hash day not yet cached at restore() time
 
@@ -52,6 +60,12 @@ function nearestEpoch(epochs, ms) {
 
 export function restore({ state, manifest, globe, features }) {
   const p = parseHash();
+
+  // v2.11: the tab key is functional (not just decorative) — studies.js
+  // validates it against its TABS and falls back to the kind-derived tab,
+  // so garbage values degrade silently (stability contract)
+  const tab = p.get('tab');
+  if (features?.studies && tab && /^[a-z-]+$/.test(tab)) state.tab = tab;
 
   const day = p.get('day');
   if (day && /^\d{4}-\d{2}-\d{2}$/.test(day) && day !== state.day) {
@@ -135,13 +149,20 @@ export function attach({ state, manifest, globe, hooks, onChange }) {
     // construction and `:`/`,` must stay readable in shared links
     const { x, y, z } = globe.camera.position;
     const rec = manifest.series?.[state.day];
+    // state.tab (set by studies.js) wins over the kind-derived tab: the
+    // kind-less tabs both host diurnal data. For plain day links the tab
+    // key is emitted only when it adds information (≠ daily), so every
+    // pre-v2.11 link shape round-trips unchanged.
     const when = rec
-      ? { tab: TAB_OF_KIND[rec.kind] ?? rec.kind,
+      ? { tab: state.tab ?? TAB_OF_KIND[rec.kind] ?? rec.kind,
           series: state.day,
           e: rec.epochs[Math.max(0, Math.min(rec.epochs.length - 1,
                                              Math.round(state.pos)))]
             .slice(0, 16) }                       // trim to minutes
-      : { day: state.day, t: fmtTime(state.pos * 15) };
+      : {
+        ...(state.tab && state.tab !== 'daily' ? { tab: state.tab } : {}),
+        day: state.day, t: fmtTime(state.pos * 15),
+      };
     const pairs = {
       ...when,
       f: Object.keys(state.enabled)
@@ -156,8 +177,14 @@ export function attach({ state, manifest, globe, hooks, onChange }) {
     if (state.family && state.family !== 'ci') {   // v2.9 lens; ci = absent,
       pairs.family = state.family;                 // so old links stay stable
     }
-    if (state.sun) pairs.sun = '1';          // only set by the sun feature
-    if (state.relief) pairs.r = '1';         // only set by the relief feature
+    // sun/relief are on by default (v2.12): the keys mark the deviation,
+    // so only the off state is written (their features also parse the old
+    // explicit =1 form)
+    if (!state.sun) pairs.sun = '0';
+    if (!state.relief) pairs.r = '0';
+    if (state.frame && state.frame !== 'ecef') {   // v2.12; ecef = absent,
+      pairs.frame = state.frame;                   // so old links stay stable
+    }
     return '#' + Object.entries(pairs).map(([k, v]) => `${k}=${v}`).join('&');
   }
 

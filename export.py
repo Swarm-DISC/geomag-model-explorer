@@ -28,8 +28,8 @@ from pathlib import Path
 import numpy as np
 
 from fetch import (COASTLINE_RAW, DATA_ROOT, FIELDS, ROOT, SERIES,
-                   VALIDITY_PATH, FieldSpec, day_fields, raw_npz_path,
-                   series_field, series_npz_path)
+                   VALIDITY_PATH, FieldSpec, day_fields, model_name,
+                   raw_npz_path, series_field, series_npz_path)
 
 WEB_DATA = DATA_ROOT / "web" / "data"   # follows GEOMAG_MODEL_EXPLORER_DATA (PLAN §5)
 MANIFEST_JSON = WEB_DATA / "manifest.json"
@@ -171,6 +171,9 @@ def export_series(series_id: str) -> None:
         "family": series.family,
         "fields": list(series.fields),
         "single_step": list(series.single_step),
+        # the served model behind each field under this series' family —
+        # ground truth for the model-info modal (v2.11)
+        "models": {name: model_name(f.model) for name, f in sfields.items()},
         # the storage range each field's tiles were quantized with — may
         # override the field default (CHAOS-Core at the CMB needs ~3x)
         "qrange_nT": {name: f.qrange for name, f in sfields.items()},
@@ -218,9 +221,13 @@ def write_manifest(day_record: tuple[str, dict] | None = None,
         existing = json.loads(MANIFEST_JSON.read_text())
 
     validity = existing.get("validity")
+    models = existing.get("models")
     if VALIDITY_PATH.exists():
         v = json.loads(VALIDITY_PATH.read_text())
         validity = {"start": v["start"], "end": v["end"]}
+        # per-model validity + served expression (degree range), straight
+        # from `fetch.py --validity` — the model-info modal's data (v2.11)
+        models = v.get("per_model", models)
 
     fields = {}
     for f in FIELDS.values():
@@ -229,7 +236,9 @@ def write_manifest(day_record: tuple[str, dict] | None = None,
         rec = {"grid": [f.nlon, f.nlat], "qrange_nT": f.qrange,
                "vmax_nT": f.vmax, "cadence": f.cadence,
                "n_steps": f.n_steps, "shells": dict(f.shells),
-               "units": f.units}
+               "units": f.units,
+               # the day cache's (CI) model + the derived-SV marker (v2.11)
+               "model": model_name(f.model), "sv": f.sv}
         if f.cadence == "static":
             prior = existing.get("fields", {}).get(f.name, {})
             stats = (static_stats or {}).get(f.name, prior.get("stats"))
@@ -257,9 +266,12 @@ def write_manifest(day_record: tuple[str, dict] | None = None,
         # that ignores it sees exactly the v1 schema.
         # v3 (v2.9): per-field "units", per-series "family"/"single_step",
         # and the series-only core-sv field record — all additive again.
-        "version": 3,
+        # v4 (v2.11): per-field "model"/"sv", per-series "models", top-level
+        # "models" (validity + expression per served model) — additive again.
+        "version": 4,
         "default_day": DEFAULT_DAY,
         "validity": validity,
+        "models": models,
         "fields": fields,
         "static_done": _static_complete(),
         "days": days,

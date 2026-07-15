@@ -1,0 +1,27 @@
+# Heimdall gate — PUBLIC side (GitHub). Gates community PRs before they can merge.
+# Runs secret-scan + license + project checks. The infra-identifier scrub is SKIPPED here
+# (the denylist holds internal identifiers and stays on the internal side; the internal gate
+# re-scans anything synced back). The job is named `heimdall-gate` so branch protection can
+# require the `heimdall-gate` status check.
+name: heimdall gate
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  heimdall-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          curl -sSL -o /tmp/gl.tgz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz
+          tar -xzf /tmp/gl.tgz -C /usr/local/bin gitleaks || true
+      - name: Run heimdall gate
+        env:
+          HEIMDALL_SKIP_INFRA: "1"
+        run: bash .heimdall/gate.sh

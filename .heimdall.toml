@@ -12,8 +12,9 @@ description = "Interactive 3D visualization of Earth's geomagnetic field from th
 topics = ["swarm", "geomagnetism", "geomagnetic-field", "vires", "threejs", "webgl", "visualization"]
 
 [history]
-mode = "snapshot"               # one-way clean tree export; internal history is NOT published
-                                # (graduate to shared later if history is scrubbed + re-seeded)
+mode = "mirror"                 # one-way; each sync appends one consolidated commit on top of
+                                # public (internal history is NOT published, public is never
+                                # force-pushed). Switch to shared only if history is scrubbed.
 
 [sync]
 branches = ["main"]             # only these branches mirror/reconcile; all else stays private
@@ -24,9 +25,16 @@ branches = ["main"]             # only these branches mirror/reconcile; all else
 # secret_scan = "gitleaks"      # default
 # checks = ["make test"]        # arbitrary commands, any language; run by the gate
 
-# [preview]                     # LAN preview (optional). {port}/{prefix} are substituted by Heimdall.
-# cmd = "make preview PORT={port} PREFIX={prefix}"
-# websocket = true
+[preview]                       # LAN branch-preview service.
+# cmd = "make preview PORT={port} PREFIX={prefix}"   # native run — unused here: this
+#                                                    # project ships a deploy/Dockerfile,
+#                                                    # so previews run as containers.
+# Feature-branch previews serve the developer's already-exported data (read-only) instead of
+# re-fetching gigabytes from VirES per branch (slow, unreliable, and lost on every container
+# rebuild). Repo-relative source -> container mount point; env skips the startup fetch. main
+# is unaffected — it keeps its own persistent, independently-fetched /data volume.
+data_mounts = { "web/data" = "/data/web/data", "data" = "/data/data" }
+env = { GEOMAG_MODEL_EXPLORER_SKIP_FETCH = "1" }
 
 [deploy]                        # emit-only deployment-setup registration
 target = "deployment-setup/experimental"

@@ -13,7 +13,7 @@
 <header id="controls">
   <div class="controls-row" id="controls-primary">
     <span id="title">Geomag Model Explorer</span>
-    <!-- studies.js injects #family-bar (Model series) + #study-tabs after #title -->
+    <!-- studies.js injects #field-bar (Field to explore) + #family-bar (Model) after #title -->
   </div>
   <div class="controls-row" id="controls-secondary">
     <fieldset id="field-toggles" aria-label="fields"></fieldset>
@@ -27,24 +27,24 @@
 
 <main id="globe">
   <div id="shell-control">
-    <label for="shell-slider">shell</label>
+    <label for="shell-slider">Shell altitude</label>
     <input type="range" id="shell-slider" min="0" max="0" step="1" value="0">
     <span id="shell-label"></span>
   </div>
   <div id="readout" hidden></div>
   <div id="colorbar">
-    <span id="colorbar-min"></span>
-    <div id="colorbar-ramp"></div>
     <span id="colorbar-max"></span>
+    <div id="colorbar-ramp-wrap"><div id="colorbar-ramp"></div></div>
+    <span id="colorbar-min"></span>
     <button id="colorbar-lock" aria-pressed="false"
       title="lock colour scale">🔓</button>
   </div>
   <div id="attribution">
-    Data: <a href="https://earth.esa.int/eogateway/missions/swarm"
-      target="_blank" rel="noopener">ESA Swarm</a> via
+    An <a href="https://earth.esa.int/eogateway/missions/swarm"
+      target="_blank" rel="noopener">ESA Swarm</a> project via
     <a href="https://vires.services" target="_blank" rel="noopener">VirES</a>
     — <span id="model-attribution">Comprehensive Inversion models
-    (MCO/MLI/MIO/MMA_SHA_2C; DTU Space, IPGP et&nbsp;al.)</span>
+    (<a href="https://swarmhandbook.earth.esa.int/catalogue/sw_mco_sha_2c" target="_blank" rel="noopener">MCO</a>/<a href="https://swarmhandbook.earth.esa.int/catalogue/sw_mli_sha_2c" target="_blank" rel="noopener">MLI</a>/<a href="https://swarmhandbook.earth.esa.int/catalogue/sw_mio_sha_2c" target="_blank" rel="noopener">MIO</a>/<a href="https://swarmhandbook.earth.esa.int/catalogue/sw_mma_sha_2c" target="_blank" rel="noopener">MMA</a>_SHA_2C; DTU Space et&nbsp;al.)</span>
   </div>
   <div id="error" hidden></div>
 </main>

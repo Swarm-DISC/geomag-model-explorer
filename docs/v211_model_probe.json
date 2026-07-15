@@ -1,0 +1,429 @@
+{
+  "probed_at": "2026-07-01T21:07:35.269992+00:00",
+  "catalog": {
+    "n_available": 30,
+    "names": [
+      "AMPS",
+      "CHAOS",
+      "CHAOS-Core",
+      "CHAOS-MIO",
+      "CHAOS-MMA",
+      "CHAOS-MMA-Primary",
+      "CHAOS-MMA-Secondary",
+      "CHAOS-Static",
+      "IGRF",
+      "LCS-1",
+      "MCO_SHA_2C",
+      "MCO_SHA_2D",
+      "MCO_SHA_2X",
+      "MF7",
+      "MIO_SHA_2C",
+      "MIO_SHA_2C-Primary",
+      "MIO_SHA_2C-Secondary",
+      "MIO_SHA_2D",
+      "MIO_SHA_2D-Primary",
+      "MIO_SHA_2D-Secondary",
+      "MLI_SHA_2C",
+      "MLI_SHA_2D",
+      "MLI_SHA_2E",
+      "MMA_SHA_2C",
+      "MMA_SHA_2C-Primary",
+      "MMA_SHA_2C-Secondary",
+      "MMA_SHA_2F",
+      "MMA_SHA_2F-Primary",
+      "MMA_SHA_2F-Secondary",
+      "SwarmCI"
+    ],
+    "candidates_present": {
+      "IGRF": true,
+      "MCO_SHA_2D": true,
+      "LCS-1": true,
+      "MF7": true,
+      "MLI_SHA_2D": true,
+      "MIO_SHA_2D": true,
+      "MMA_SHA_2F": true
+    },
+    "unevaluated_present": {
+      "CHAOS-MIO": true,
+      "AMPS": true,
+      "MLI_SHA_2E": true
+    }
+  },
+  "models": {
+    "IGRF": {
+      "alias": "IGRF",
+      "expression": "IGRF(max_degree=13,min_degree=1)",
+      "validity": {
+        "start": "1900-01-01T00:00:00Z",
+        "end": "2030-01-01T00:00:00Z"
+      }
+    },
+    "MCO_SHA_2D": {
+      "alias": "MCO_SHA_2D",
+      "expression": "MCO_SHA_2D(max_degree=20,min_degree=1)",
+      "validity": {
+        "start": "2013-11-25T12:00:00.000003Z",
+        "end": "2018-01-01T00:00:00Z"
+      }
+    },
+    "LCS-1": {
+      "alias": "LCS-1",
+      "expression": "'LCS-1'(max_degree=185,min_degree=1)",
+      "validity": {
+        "start": "0001-01-01T00:00:00Z",
+        "end": "4000-01-01T00:00:00Z"
+      }
+    },
+    "MF7": {
+      "alias": "MF7",
+      "expression": "MF7(max_degree=133,min_degree=16)",
+      "validity": {
+        "start": "0001-01-01T00:00:00Z",
+        "end": "4000-01-01T00:00:00Z"
+      }
+    },
+    "MLI_SHA_2D": {
+      "alias": "MLI_SHA_2D",
+      "expression": "MLI_SHA_2D(max_degree=133,min_degree=16)",
+      "validity": {
+        "start": "0001-01-01T00:00:00Z",
+        "end": "4000-01-01T00:00:00Z"
+      }
+    },
+    "MIO_SHA_2D": {
+      "alias": "MIO_SHA_2D",
+      "expression": "'MIO_SHA_2D-Primary'(max_degree=60,min_degree=1) + 'MIO_SHA_2D-Secondary'(max_degree=60,min_degree=1)",
+      "validity": {
+        "start": "0001-01-01T00:00:00Z",
+        "end": "4000-01-01T00:00:00Z"
+      }
+    },
+    "MMA_SHA_2F": {
+      "alias": "MMA_SHA_2F",
+      "expression": "'MMA_SHA_2F-Primary'(max_degree=1,min_degree=1) + 'MMA_SHA_2F-Secondary'(max_degree=1,min_degree=1)",
+      "validity": {
+        "start": "2013-11-25T11:15:00Z",
+        "end": "2026-06-27T21:45:00Z"
+      }
+    },
+    "CHAOS-MIO": {
+      "alias": "CHAOS-MIO",
+      "expression": "'CHAOS-MIO'()",
+      "validity": {
+        "start": "1900-01-01T00:00:00Z",
+        "end": "2030-01-01T00:00:00Z"
+      }
+    },
+    "AMPS": {
+      "alias": "AMPS",
+      "expression": "AMPS()",
+      "validity": {
+        "start": "1900-01-01T00:00:00Z",
+        "end": "2030-01-01T00:00:00Z"
+      }
+    },
+    "MLI_SHA_2E": {
+      "alias": "MLI_SHA_2E",
+      "expression": "MLI_SHA_2E(max_degree=600,min_degree=16)",
+      "validity": {
+        "start": "0001-01-01T00:00:00Z",
+        "end": "4000-01-01T00:00:00Z"
+      }
+    }
+  },
+  "amplitudes": {
+    "MLI_SHA_2C": {
+      "ok": true,
+      "when": "2020-01-01T12:00:00",
+      "grid": [
+        361,
+        181
+      ],
+      "shells": {
+        "surface": {
+          "max": 912.1758395628316,
+          "p99": 162.84882992664933,
+          "median": 39.271820774408326,
+          "component_max": [
+            459.7402862372486,
+            522.5543948752548,
+            875.3035254597736
+          ]
+        }
+      }
+    },
+    "MLI_SHA_2D": {
+      "ok": true,
+      "when": "2020-01-01T12:00:00",
+      "grid": [
+        361,
+        181
+      ],
+      "shells": {
+        "surface": {
+          "max": 1021.7145491009496,
+          "p99": 171.32525616006603,
+          "median": 38.41123934504034,
+          "component_max": [
+            486.3247854931865,
+            587.7819736288758,
+            940.1464505420062
+          ]
+        }
+      }
+    },
+    "LCS-1": {
+      "ok": true,
+      "when": "2020-01-01T12:00:00",
+      "grid": [
+        361,
+        181
+      ],
+      "shells": {
+        "surface": {
+          "max": 1561.1608552789032,
+          "p99": 211.46344097493179,
+          "median": 37.78675659338683,
+          "component_max": [
+            764.29583625945,
+            805.6470662693011,
+            1425.0402420420683
+          ]
+        }
+      }
+    },
+    "MF7": {
+      "ok": true,
+      "when": "2020-01-01T12:00:00",
+      "grid": [
+        361,
+        181
+      ],
+      "shells": {
+        "surface": {
+          "max": 1133.3128214785477,
+          "p99": 180.92416294122947,
+          "median": 40.76544503206612,
+          "component_max": [
+            537.9549198628857,
+            676.5227066856269,
+            1066.8920296402218
+          ]
+        }
+      }
+    },
+    "MCO_SHA_2D": {
+      "ok": true,
+      "when": "2016-01-01T12:00:00",
+      "grid": [
+        361,
+        181
+      ],
+      "shells": {
+        "cmb": {
+          "max": 7673028.7517493665,
+          "p99": 6137894.548490356,
+          "median": 2392020.070297923,
+          "component_max": [
+            5382116.825724976,
+            5321053.261404234,
+            7670266.340551275
+          ]
+        },
+        "surface": {
+          "max": 66667.48274547441,
+          "p99": 65335.248410351895,
+          "median": 47709.85293054232,
+          "component_max": [
+            41796.68085049683,
+            17335.214657997476,
+            66601.70544192508
+          ]
+        }
+      }
+    },
+    "IGRF": {
+      "ok": true,
+      "when": "2020-01-01T12:00:00",
+      "grid": [
+        361,
+        181
+      ],
+      "shells": {
+        "cmb": {
+          "max": 908376.9880772766,
+          "p99": 816997.961234998,
+          "median": 371016.9025618679,
+          "component_max": [
+            652382.6833588073,
+            473861.25117919757,
+            906923.4300202435
+          ]
+        },
+        "surface": {
+          "max": 66679.83814868402,
+          "p99": 65319.82299883632,
+          "median": 47677.20479366264,
+          "component_max": [
+            41939.897708335615,
+            17411.616924942537,
+            66610.89944170944
+          ]
+        }
+      }
+    },
+    "IGRF@1950": {
+      "ok": true,
+      "when": "1950-06-01T12:00:00",
+      "grid": [
+        361,
+        181
+      ],
+      "shells": {
+        "cmb": {
+          "max": 927466.5696836325,
+          "p99": 854706.1342132639,
+          "median": 368007.3670733991,
+          "component_max": [
+            573772.6316047912,
+            460014.680212513,
+            926853.7073134206
+          ]
+        },
+        "surface": {
+          "max": 68643.85337586778,
+          "p99": 67581.86110402361,
+          "median": 49214.205540144576,
+          "component_max": [
+            41172.13578768485,
+            15704.582209418975,
+            68603.37998225955
+          ]
+        }
+      }
+    },
+    "MIO_SHA_2D": {
+      "ok": true,
+      "when": "2020-01-01T12:00:00",
+      "grid": [
+        181,
+        91
+      ],
+      "shells": {
+        "surface": {
+          "max": 55.64039170861509,
+          "p99": 30.298631796309703,
+          "median": 6.058990490794997,
+          "component_max": [
+            54.70260259056591,
+            27.010794841001534,
+            32.447271370192276
+          ]
+        }
+      }
+    },
+    "MMA_SHA_2F": {
+      "ok": true,
+      "when": "2020-01-01T12:00:00",
+      "grid": [
+        181,
+        91
+      ],
+      "shells": {
+        "surface": {
+          "max": 9.797712169148117,
+          "p99": 9.776294082822584,
+          "median": 8.156823947401556,
+          "component_max": [
+            7.794976207674637,
+            7.681990854969558,
+            5.994203814036541
+          ]
+        }
+      }
+    }
+  },
+  "sv": {
+    "MCO_SHA_2D": {
+      "ok": true,
+      "when": "2016-01-01T12:00:00",
+      "span_years": 1.0,
+      "shells": {
+        "cmb": {
+          "max": 40260.365448768316,
+          "p99": 33200.37703925473,
+          "median": 10999.69838855561,
+          "component_max": [
+            20807.09042685153,
+            32969.22372590727,
+            40125.996979092946
+          ]
+        },
+        "surface": {
+          "max": 204.54206524193174,
+          "p99": 183.1038796450144,
+          "median": 73.11419774731971,
+          "component_max": [
+            96.78670132332991,
+            90.76696049355178,
+            203.47833247685583
+          ]
+        }
+      }
+    },
+    "IGRF": {
+      "ok": true,
+      "when": "2018-06-01T12:00:00",
+      "span_years": 1.0,
+      "shells": {
+        "cmb": {
+          "max": 30223.521823721614,
+          "p99": 24392.33068185496,
+          "median": 4299.251982625851,
+          "component_max": [
+            15602.793590978908,
+            23038.82608914122,
+            30190.805323951412
+          ]
+        },
+        "surface": {
+          "max": 215.87226998773238,
+          "p99": 189.45345963789921,
+          "median": 74.80292991724801,
+          "component_max": [
+            99.32603612348612,
+            86.3842949368634,
+            214.91864101414558
+          ]
+        }
+      }
+    },
+    "IGRF@1950": {
+      "ok": true,
+      "when": "1950-06-01T12:00:00",
+      "span_years": 1.0,
+      "shells": {
+        "cmb": {
+          "max": 86208.16784847944,
+          "p99": 74141.20491183699,
+          "median": 24852.987987199776,
+          "component_max": [
+            72190.05456556269,
+            55852.44068481657,
+            86141.89500038145
+          ]
+        },
+        "surface": {
+          "max": 179.38178331881397,
+          "p99": 168.7700947999096,
+          "median": 59.26353859731492,
+          "component_max": [
+            101.05244039194258,
+            97.73184111429146,
+            178.87645514654287
+          ]
+        }
+      }
+    }
+  }
+}

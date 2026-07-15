@@ -63,7 +63,10 @@ initial_fetch() {
   run python fetch.py --validity                                       || log "WARN: validity fetch failed"
   run python fetch.py --static && run python export.py --static        || log "WARN: static/crust fetch failed"
   run python fetch.py --day "$day" && run python export.py --day "$day" || log "WARN: day $day fetch/export failed"
-  for s in $(run python -c 'import fetch; print(" ".join(sorted(fetch.SERIES)))' 2>/dev/null); do
+  # curated cheap-first order (fetch.STARTUP_SERIES_ORDER, v2.11): the
+  # one-eval statics land families in the UI within minutes; the 26-epoch
+  # IGRF century runs last. Alphabetical order would run it first.
+  for s in $(run python -c 'import fetch; print(" ".join(fetch.STARTUP_SERIES_ORDER))' 2>/dev/null); do
     run python fetch.py --series "$s" && run python export.py --series "$s" || log "WARN: series $s fetch/export failed"
   done
   log "background fetch finished"

@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
 # Heimdall pre-push — run the gate before pushing to a synced branch (fast local feedback).
 # Installed via core.hooksPath=.heimdall/githooks by `heimdall adopt`.
+#
+# git passes the remote NAME as $1 and its URL as $2. The infra-identifier scrub only matters when
+# crossing to the PUBLIC host — an internal remote may legitimately carry internal identifiers
+# (that is exactly what history=mirror is for). So run the FULL gate when pushing to the `public`
+# remote (by name, or by a URL matching it) and skip the infra scrub otherwise. The secret scan
+# always runs; the real public-crossing scrub also runs in `heimdall sync`/`publish` and public CI.
 set -uo pipefail
+remote="${1:-}"; url="${2:-}"
 root="$(git rev-parse --show-toplevel)"
+pub_url="$(git remote get-url public 2>/dev/null || true)"
+if [ "$remote" = public ] || { [ -n "$url" ] && [ -n "$pub_url" ] && [ "$url" = "$pub_url" ]; }; then
+  :                                # crossing to public → full gate (secret scan + infra scrub)
+else
+  export HEIMDALL_SKIP_INFRA=1     # internal remote → secret scan only (identifiers allowed there)
+fi
 while read -r _localref _localsha remoteref _remotesha; do
   case "$remoteref" in
     refs/heads/main) exec bash "$root/.heimdall/gate.sh" ;;

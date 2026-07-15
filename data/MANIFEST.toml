@@ -126,6 +126,123 @@ sha256 = "8268ab4632533a662c686c4d84d12e4b868650dbdde2f55135cb7d9434516c4e"
 series_kind = "secular"
 series_family = "chaos"
 
+[files."series/core-secular@igrf/core"]
+model = "Core = IGRF"
+grid = "361x181"
+shells = ["cmb", "d2500", "d2000", "d1500", "d1000", "d500", "surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
+radii_m = [3480000.0, 3871000.0, 4371000.0, 4871000.0, 5371000.0, 5871000.0, 6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
+n_snapshots = 26
+time = "1900-06-01T12:00:00/5y/26"
+viresclient = "0.16.0"
+fetched_at = "2026-07-01T21:31:09.269635+00:00"
+sha256 = "53c815c032fa008c8400e9b1f6003b15e6b163f7ba00ec96c26ccaf540fdf6d0"
+series_kind = "secular"
+series_family = "igrf"
+
+[files."series/core-secular@igrf/core-sv"]
+model = "Core = IGRF"
+grid = "361x181"
+shells = ["cmb", "d2500", "d2000", "d1500", "d1000", "d500", "surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
+radii_m = [3480000.0, 3871000.0, 4371000.0, 4871000.0, 5371000.0, 5871000.0, 6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
+n_snapshots = 26
+time = "1900-06-01T12:00:00/5y/26 (sv: centered ±6mo finite difference, nT/yr)"
+viresclient = "0.16.0"
+fetched_at = "2026-07-01T21:31:09.980097+00:00"
+sha256 = "5e9c6d47042756e92742fc1cf12f11ab89211f4594ea9c53ebd18791b6433d6c"
+series_kind = "secular"
+series_family = "igrf"
+
+[files."series/core-secular@mco2d/core"]
+model = "Core = 'MCO_SHA_2D'"
+grid = "361x181"
+shells = ["cmb", "d2500", "d2000", "d1500", "d1000", "d500", "surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
+radii_m = [3480000.0, 3871000.0, 4371000.0, 4871000.0, 5371000.0, 5871000.0, 6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
+n_snapshots = 4
+time = "2014-06-01T12:00:00/1y/4"
+viresclient = "0.16.0"
+fetched_at = "2026-07-01T21:14:07.573060+00:00"
+sha256 = "c74d0863c8868e3b9a529c1e6ad28e23a5f0e72c4573e9e71178879d5d800223"
+series_kind = "secular"
+series_family = "mco2d"
+
+[files."series/core-secular@mco2d/core-sv"]
+model = "Core = 'MCO_SHA_2D'"
+grid = "361x181"
+shells = ["cmb", "d2500", "d2000", "d1500", "d1000", "d500", "surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
+radii_m = [3480000.0, 3871000.0, 4371000.0, 4871000.0, 5371000.0, 5871000.0, 6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
+n_snapshots = 4
+time = "2014-06-01T12:00:00/1y/4 (sv: centered ±6mo finite difference, nT/yr)"
+viresclient = "0.16.0"
+fetched_at = "2026-07-01T21:14:07.648614+00:00"
+sha256 = "aae9359086df1b841b926edde91c950633ca024b68dc058d315eeddef88eafa4"
+series_kind = "secular"
+series_family = "mco2d"
+
+[files."series/crust-static/crust"]
+model = "Crust = 'MLI_SHA_2C'"
+grid = "361x181"
+shells = ["surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
+radii_m = [6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
+n_snapshots = 1
+time = "2020-01-01T12:00:00 (single step)"
+viresclient = "0.16.0"
+fetched_at = "2026-07-01T21:10:31.281503+00:00"
+sha256 = "2701a8a72ebe93531ff8b43044a186c85b1cef6eeb60a4260ad4f7c01caff249"
+series_kind = "static"
+series_family = "ci"
+
+[files."series/crust-static@chaos/crust"]
+model = "Crust = 'CHAOS-Static'"
+grid = "361x181"
+shells = ["surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
+radii_m = [6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
+n_snapshots = 1
+time = "2020-01-01T12:00:00 (single step)"
+viresclient = "0.16.0"
+fetched_at = "2026-07-01T21:11:09.369224+00:00"
+sha256 = "485e6d777c3ba93750f5934fd38693cdfd7d95d2eca821d6ec51155f5a8650b5"
+series_kind = "static"
+series_family = "chaos"
+
+[files."series/crust-static@lcs1/crust"]
+model = "Crust = 'LCS-1'"
+grid = "361x181"
+shells = ["surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
+radii_m = [6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
+n_snapshots = 1
+time = "2020-01-01T12:00:00 (single step)"
+viresclient = "0.16.0"
+fetched_at = "2026-07-01T21:11:47.658868+00:00"
+sha256 = "1bb1f67debfebed3e10569c311e2c1b70c547cbd1ad27cb0085763146ab1b7b2"
+series_kind = "static"
+series_family = "lcs1"
+
+[files."series/crust-static@mf7/crust"]
+model = "Crust = 'MF7'"
+grid = "361x181"
+shells = ["surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
+radii_m = [6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
+n_snapshots = 1
+time = "2020-01-01T12:00:00 (single step)"
+viresclient = "0.16.0"
+fetched_at = "2026-07-01T21:12:10.028918+00:00"
+sha256 = "69eb402a2359ac3e3d3a3f336493053d81e3203a1111a2f1ce19ccf2152d7ca5"
+series_kind = "static"
+series_family = "mf7"
+
+[files."series/crust-static@mli2d/crust"]
+model = "Crust = 'MLI_SHA_2D'"
+grid = "361x181"
+shells = ["surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
+radii_m = [6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
+n_snapshots = 1
+time = "2020-01-01T12:00:00 (single step)"
+viresclient = "0.16.0"
+fetched_at = "2026-07-01T21:12:32.306256+00:00"
+sha256 = "93038cefab513940019f6c4e5ad4a63183df9323ae2c5bb91d32faa7b9df79b5"
+series_kind = "static"
+series_family = "mli2d"
+
 [files."series/daily-2020-01-01@chaos/core"]
 model = "Core = 'CHAOS-Core'"
 grid = "361x181"
@@ -165,6 +282,19 @@ sha256 = "3223d3557ca7ab8441b37f989ae9ea46b5192695629bf3178d6d26dd6d32bf5e"
 series_kind = "diurnal"
 series_family = "chaos"
 
+[files."series/daily-2020-01-01@mma2f/magneto"]
+model = "Magnetosphere = 'MMA_SHA_2F'"
+grid = "181x91"
+shells = ["surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
+radii_m = [6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
+n_snapshots = 97
+time = "2020-01-01T00:00:00/15min/97"
+viresclient = "0.16.0"
+fetched_at = "2026-07-01T21:21:41.728068+00:00"
+sha256 = "d3ff40b54e40442e2c5fe1c3c21f3e87cf3c07afc1e35b7255b941a96e45cf58"
+series_kind = "diurnal"
+series_family = "mma2f"
+
 [files."series/mio-seasonal-2020/iono"]
 model = "Ionosphere = 'MIO_SHA_2C'"
 grid = "181x91"
@@ -176,6 +306,19 @@ viresclient = "0.16.0"
 fetched_at = "2026-06-12T15:30:06.786981+00:00"
 sha256 = "50eb100c20393693c45feaedd291f06efb98044c5628e08826c39d48c503b107"
 series_kind = "annual"
+
+[files."series/mio-seasonal-2020@mio2d/iono"]
+model = "Ionosphere = 'MIO_SHA_2D'"
+grid = "181x91"
+shells = ["surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
+radii_m = [6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
+n_snapshots = 53
+time = "2020-01-01T12:00:00/7d/53"
+viresclient = "0.16.0"
+fetched_at = "2026-07-01T21:19:30.857657+00:00"
+sha256 = "b9adc13c6782ff15bf741163f24a32c1a5716e4c0e0664821036b1c86d206802"
+series_kind = "annual"
+series_family = "mio2d"
 
 [files."static/crust"]
 model = "Crust = 'MLI_SHA_2C'"
