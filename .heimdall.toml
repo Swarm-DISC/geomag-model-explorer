@@ -20,8 +20,8 @@ mode = "mirror"                 # one-way; each sync appends one consolidated co
 branches = ["main"]             # only these branches mirror/reconcile; all else stays private
 
 [gate]
-# require_license = true        # only set if you want the gate to insist a LICENSE exists
-# license = "MIT"               # SPDX id the gate matches against; Heimdall imposes none
+require_license = true          # the gate insists a LICENSE file exists at the root…
+license = "MIT"                 # …and matches this SPDX id (Heimdall imposes none)
 # secret_scan = "gitleaks"      # default
 # checks = ["make test"]        # arbitrary commands, any language; run by the gate
 
