@@ -2,21 +2,14 @@
 
 Agent-agnostic guide; `CLAUDE.md` is a symlink to this file.
 
-**geomag-model-explorer** is a browser-based interactive 3D visualization of geomagnetic fields:
-core, crust, ionosphere, and magnetosphere — geomagnetic models served by VirES,
-primarily the CI chain (MCO_SHA_2C, MLI_SHA_2C, MIO_SHA_2C, MMA_SHA_2C), plus every
-other grid-evaluable VirES model as single-field families (v2.11: CHAOS, IGRF
-1900–2025, MCO/MLI/MIO_SHA_2D, MMA_SHA_2F, LCS-1, MF7; CHAOS-MIO/AMPS/MLI_SHA_2E
-deliberately unevaluated, greyed with the reason) —
-**evaluated via viresclient only** — rendered on a three.js globe with
-field toggles (summable), a component picker, an altitude/depth shell slider, an
-any-day date picker (default 2020-01-01; days fetched on demand and cached), and a
-bottom-docked time slider with playback. Study selection is two dropdowns
-(v2.10/v2.11): a primary "Field to explore" (All / Core / Crust / Ionosphere /
-Magnetosphere — per-source views over the same globe) and a secondary "Model"
-that greys out where a field has no data (PLAN §3; Storms demoted to IDEAS §9,
-Secular folded into Core). An ⓘ modal (flag `modelinfo`) documents the served
-model behind each on-screen layer.
+**geomag-model-explorer** is a browser-based interactive 3D visualization of
+Earth's geomagnetic field: models served by VirES — the Swarm CI chain as the
+primary four-field family (core, crust, ionosphere, magnetosphere) plus every
+other grid-evaluable VirES model as single-field families — **evaluated via
+viresclient only**, rendered as colormapped shells on a three.js globe with
+studies dropdowns, day/night sunlight, relief displacement, and an ECEF | ECI
+frame switch. The authoritative current-state description is `PLAN.md` §1 —
+keep it there, not here.
 
 Read these first, in order:
 
@@ -30,9 +23,12 @@ Read these first, in order:
 
 ## Quick facts
 
-- **Port:** 8212 (reserved; portal proxy `/foundry/geomag-model-explorer/` once served).
-- **Redeploy:** `systemctl --user restart geomag-model-explorer-web.service` (Phase 1+; unit
-  in `deploy/` once it exists).
+- **Port:** 8212 (`geomag-model-explorer-web.service`; portal proxy
+  `/foundry/geomag-model-explorer/`).
+- **Redeploy:** `systemctl --user restart geomag-model-explorer-web.service` (unit in
+  `deploy/`). Note the service serves its **own data dir** (`GEOMAG_MODEL_EXPLORER_DATA`)
+  — browser-verify branch work against the branch's Heimdall **:8300 preview** (which
+  mounts the checkout's `web/data`), not :8212.
 - **Environments:** `uv` project. `uv sync` for dev; `uv sync --extra fetch` only
   when running `fetch.py` (viresclient). Tests: `uv run pytest`.
 - **Headless browser:** Playwright + Chromium cached workspace-wide. WebGL2 +
@@ -40,7 +36,7 @@ Read these first, in order:
   (`tests/webgl_probe_result.json`).
 - **VirES credentials:** `~/.viresclient.ini` (configured & verified
   2026-06-10). Used only by `fetch.py` — including when `serve.py` invokes it
-  for on-demand day fetches (Phase 2+). Never commit tokens.
+  for on-demand day fetches. Never commit tokens.
 - **Prior art to consult:**
   `/home/ivaldi/foundry/vizlab/projects/geomag-field-globes/` (viresclient
   eval_model pattern, MANIFEST.toml provenance) and

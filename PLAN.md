@@ -2,51 +2,46 @@
 
 *Browser-based interactive 3D visualization of Earth's geomagnetic field.*
 
-**Status: v1 shipped 2026-06-11** (phases 0–6 complete). This file describes
-the *current* state and what is genuinely live. The full v1 working plan —
-decisions, rationale, phase checklists, prerequisite probes — is archived in
-[`HISTORY.md`](./HISTORY.md); the original seed note is `NOTE.md`. Per RULES
-§8, this file is refreshed (and the old generation archived) whenever it
-drifts into describing history rather than current state.
+**Status: v2.12 shipped, merged and published 2026-07-15** (the v2 studies
+generation — v2.3 through v2.12 — is complete and archived in
+[`HISTORY.md`](./HISTORY.md); the v1 plan and the v2.1/v2.2 governance phases
+are earlier sections there). This file describes the *current* state and what
+is genuinely live. Per RULES §8 it is refreshed (and the old generation
+archived) whenever it drifts into describing history rather than current
+state.
 
 ## 1. What exists
 
-The four contributions to Earth's magnetic field — core (MCO_SHA_2C), crust
-(MLI_SHA_2C), ionosphere (MIO_SHA_2C), magnetosphere (MMA_SHA_2C), the Swarm
-Level-2 Comprehensive Inversion chain, evaluated via viresclient only —
-rendered as colormapped shells on a three.js globe. Field toggles (summed on
-the GPU; all four on by default since v2.12), component picker (Northward /
-Eastward / Upward / Intensity — keys N / E / Up / F), shell slider (CMB through
-500 km mantle steps to the surface, then the unified 0–1500 km altitude
-ladder at 100 km steps shared by every model — v2.7), colorbar scale lock (freezes the colour range so
-magnitude changes across shells/days stay visible; persisted in permalinks
-as `vmax=`), any-day date picker with on-demand fetch + permanent cache
-(default 2020-01-01 pre-fetched), bottom-docked time slider (00:00–24:00,
-15-min steps, 97 timesteps/day) with playback, hover readout, attribution.
-Governance shipped in v2.1/v2.2 (write-ups archived in HISTORY.md): a
-deploy-time feature-flag registry (`features.json` → `/api/features`,
-dynamically imported modules in `web/features/`), permalink state in the URL
-hash (stability contract: garbage ignored), and the colorbar scale lock.
-v2.6 added sun-derived lighting (flag `sun`; since v2.12 the surface itself
-is shaded by day/night from the displayed UT — the original subsolar glyph
-+ terminator ring overlay is retired) and relief mode (the displayed scalar
-displaces the shell, hillshaded — lit by the actual sun when both flags are
-on; flag `relief`). v2.12 added the ECEF | ECI reference-frame switch (flag
-`frame`) and flipped the defaults to all-four-fields + sunlight + relief on.
-v2.9 (flag `families`) added the model families (Swarm CI / CHAOS): Combined
-models (≡ Daily; under CHAOS a curated 15-min diurnal series), Core with a
-B ↔ dB/dt toggle (derived secular variation in nT/yr, yearly 2014–2023 series
-per family), and Ionosphere (the Seasons tab) — with missing layers greyed out
-with the reason (CHAOS deliberately has no ionospheric layer). v2.10 inverted
-the selectors into two dropdowns: a primary "Field to explore" (All ≡ Combined
-models / Core / Ionosphere) and a secondary "Model" (Swarm CI / CHAOS) that
-greys out where the chosen field has no data. v2.11 covers **every
-grid-evaluable VirES model** (probe: `docs/v211_model_probe.json`): Crust and
-Magnetosphere join the field dropdown; MCO_SHA_2D, IGRF (5-yearly 1900–2025
-century study), LCS-1, MF7, MLI_SHA_2D, MIO_SHA_2D and MMA_SHA_2F ride
-single-field families; CHAOS-MIO, AMPS and MLI_SHA_2E stay unevaluated but
-visible greyed-out with the reason; and an ⓘ modal (flag `modelinfo`)
-documents the served model behind every on-screen layer.
+Geomagnetic field models served by VirES, **evaluated via viresclient only**,
+rendered as colormapped (optionally relief-displaced) shells on a three.js
+globe. Study selection is two dropdowns: a primary **Field to explore**
+(All / Core / Crust / Ionosphere / Magnetosphere — per-source views over the
+same globe) and a secondary **Model** that greys out, with the reason, where
+the chosen field has no data. The Swarm Comprehensive Inversion chain
+(MCO/MLI/MIO/MMA_SHA_2C) is the primary four-field family; **every other
+grid-evaluable VirES model** rides as a single-field family (CHAOS, IGRF
+5-yearly 1900–2025, MCO/MLI/MIO_SHA_2D, MMA_SHA_2F, LCS-1, MF7; CHAOS-MIO,
+AMPS and MLI_SHA_2E deliberately unevaluated, greyed with the reason —
+probe: `docs/v211_model_probe.json`). An ⓘ modal (flag `modelinfo`)
+documents the served model behind every on-screen layer. Core offers a
+B ↔ dB/dt secular-variation toggle; Ionosphere is the seasonal
+(fixed-12:00-UT, pose-held) series.
+
+The view: field toggles summed on the GPU, component picker (Northward /
+Eastward / Upward / Intensity), altitude/depth shell slider (CMB → mantle
+steps → surface → the unified 0–1500 km ladder), colorbar with scale lock
+(`vmax=` in permalinks), any-day date picker with on-demand fetch +
+permanent cache, bottom-docked time slider (15-min steps, 97/day) with
+playback, hover readout (geographic under any frame), day/night **sunlight**
+shading (soft terminator, night floor 0.55), **relief** displacement
+(hillshaded, sun-lit when both flags are on), and an **ECEF | ECI**
+reference-frame switch (mean-solar pose about +Y; the globe spins under a
+world-fixed sun). Defaults (v2.12, landing-view tune 2026-07-15): all four
+fields + sunlight + relief on, shell h500, component Up, **boot at 08:00 UT**
+— ~3/4 of the landing disc lit, terminator on the Atlantic limb, Sq blob on
+screen. Permalink state lives in the URL hash (stability contract: unknown
+keys ignored, absent key = default); deploy-time feature flags
+(`features.json` → `/api/features`) gate every post-v1 module.
 
 ```
 fetch.py   the ONLY module that talks to VirES (uv --extra fetch)
@@ -59,17 +54,20 @@ web/       no-build frontend: ES modules + importmap, three.js vendored
              main.js · globe.js · shaders.js · dataset.js · ui.js
 ```
 
-Key parameters (rationale in HISTORY.md §§2–4): tiles are int16 NEC triples,
+Key parameters (rationale in HISTORY.md): tiles are int16 NEC triples,
 decoded to RGBA16F textures; storage `qrange` is decoupled from display
 `vmax`; colorbar range = sum of enabled fields' per-shell p99 (manifest,
 per day); MIO at 2°, MMA at 2°, MCO/MLI at 1°; ~320 MB of tiles per cached
-day on the v2.7 ladder. Deploy: systemd `--user` unit
-`geomag-model-explorer-web.service`, portal prefix `/foundry/geomag-model-explorer/`, redeploy =
-restart.
+day. Deploy: systemd `--user` unit `geomag-model-explorer-web.service`
+(:8212, its own data dir via `GEOMAG_MODEL_EXPLORER_DATA`), portal prefix
+`/foundry/geomag-model-explorer/`, redeploy = restart; branch previews on
+the Heimdall :8300 portal serve the checkout's exported data via
+`.heimdall.toml` data_mounts. Published via Heimdall `mirror` to
+`Swarm-DISC/geomag-model-explorer` — merging to `main` publishes.
 
 ## 2. Live operational concerns
 
-Carried forward from the v1 plan — still open, not yet decisions:
+Carried forward — still open, not yet decisions:
 
 - **Disk policy** (v1 §9.3): cached days accumulate forever — on the v2.7
   ladder ~320 MB/day tiles + ~1.3 GB/day raw npz (current cache: 1.2 GB
@@ -87,10 +85,10 @@ Carried forward from the v1 plan — still open, not yet decisions:
 - **Radial interpolation between shells** (v1 §9.6): deferred — physically
   honest continuation needs per-degree (a/r)^(n+2), i.e. client-side SH
   evaluation. Offer later as explicitly approximate, or never.
-- **Model validity ends 2023-11-30** at last check: re-run `fetch.py
-  --validity` periodically (or check at serve start) so new CI product
-  releases extend the date picker — the May/October 2024 G5 storms are the
-  prize waiting behind this (IDEAS §6.3).
+- **Model validity ends 2023-11-30** at last check (2026-06-12): re-run
+  `fetch.py --validity` periodically (or check at serve start) so new CI
+  product releases extend the date picker — the May/October 2024 G5 storms
+  are the prize waiting behind this (IDEAS §6.3).
 - **Portal/Ansible clobber risk** (pre-existing, all foundry projects): the
   internal portal role's `foundry-stub.html.j2` is stale (knows only
   vizlab) and written with `force: true` — an Ansible re-run would drop the
@@ -101,377 +99,15 @@ Carried forward from the v1 plan — still open, not yet decisions:
 
 ## 3. Next phases
 
-[`IDEAS.md`](./IDEAS.md) is the candidate backlog (~35 ideas collected
-2026-06-11, plus the §9 studies design). Items are promoted into numbered
-phases here only on human approval, with the decision date recorded.
-Completed phases v2.1 (feature registry + permalinks) and v2.2 (mantle
-shells + colorbar lock) are archived in HISTORY.md.
+**None approved.** [`IDEAS.md`](./IDEAS.md) is the candidate backlog; items
+are promoted into numbered phases here only on human approval, with the
+decision date recorded.
 
-### Scope decision — multi-timescale, multi-model studies (human-directed 2026-06-11)
-
-Widen the app to **studies on different time regimes** — century-scale core
-secular variation, seasonal/decadal MIO, storm-vs-quiet MIO+MMA with
-activity indices — and **multiple VirES model families** (CI / IGRF / CHAOS /
-WDMAM-if-served), presented as a **single-page tab strip** (Daily ≡ today's
-v1, Seasons, Storms, Secular). The seasonal MIO study proves the new
-generalized time axis ("series") first. Full design: IDEAS §9. The *scope*
-is approved; each phase below still gets per-phase sign-off before
-implementation, and each ships with the IDEAS §8.3 definition of done
-(flag + demo permalink + Playwright scenario + README line). The Storms
-study was demoted back to IDEAS on 2026-06-12 (the scope decision stands;
-only its phase slot is withdrawn — see "Beyond").
-
-### Phase v2.3 — series foundation + Seasons tab ✅ (approved & shipped 2026-06-11)
-
-Step A (own commit): `state.minutes` → `state.pos` (float epoch index over
-an explicit timeline descriptor); Daily bit-identical. Step B: manifest v2
-optional `series` map; curated `SERIES` catalog in `fetch.py`;
-`fetch.py --series` / `export.py --series`; materialized
-`mio-seasonal-2020` (weekly × 53 through the leap year at 12:00 UT, iono,
-~10 MB, −50..50 nT); `frameSource()` in dataset.js as the one availability
-rule; tab strip behind flag `studies` (Daily ≡ v1 + Seasons with series
-picker, per-tab state snapshots, control budget held); permalink encodes
-`tab=`/`series=`/`e=<ISO epoch>` (nearest-epoch restore, garbage ignored,
-flag-off ignores series links). CI-only — the family axis is untouched.
-Demo:
-`/#tab=seasons&series=mio-seasonal-2020&e=2020-07-01T12:00&f=iono&c=Up&s=surface`.
-*Verify:* `tests/test_studies_browser.py` (tab strip, Seasons playback +
-scrub, permalink roundtrip, garbage, flag-off = v1) + the live demo
-permalink.
-
-### Phase v2.6 — sunlight + relief mode ✅ (approved & shipped 2026-06-11)
-
-Two features built back-to-back in one session as designed (full design
-write-up: HISTORY.md once this entry is archived; the code is the
-authoritative sketch now). Their only integration surface is the one shader
-uniform `uLightDir`, decided up front.
-
-**Step A — sun overlay (flag `sun`, IDEAS 1.1).** `web/sun.js` (analytic
-subsolar point from the displayed UT; series epochs parsed explicitly as UT)
-+ `web/features/sun.js` (terminator LineLoop + subsolar glyph posed by one
-quaternion, own Sun checkbox, permalink `sun=1`). While the relief flag is
-also on, each update writes the world→view sun direction into `uLightDir`.
-Demo: `/#f=iono&c=Up&s=surface&t=12:00&sun=1`.
-*Verified:* `tests/test_sun_browser.py` + live pass
-(`tests/artifacts/live_sun_demo.png`).
-
-**Step B — relief mode (flag `relief`).** The displayed scalar displaces the
-shell radially in the vertex shader (shared `FIELD_CHUNK` GLSL, signed,
-fixed ±0.15 radii at the colorbar's `uVmax`, so relief and colors always
-agree incl. under lock; F all-outward); FS hillshade from `dFdx/dFdy` of the
-displaced view position, floored at 0.55 so the night side stays readable,
-lit by `uLightDir` (headlight default, the sun when both flags are on);
-`uRelief == 0` is bit-identical (phase screenshots reproduced byte-identical
-across the refactor). 256×128 mesh swapped in only while relief is on;
-hover/playback/tab snapshots untouched (raycast hits the undisplaced CPU
-sphere). Relief checkbox next to the component picker — a display mode, not
-a tab. Demos: `/#f=crust&c=Up&s=surface&r=1`;
-`/#f=iono&c=Up&s=surface&t=12:00&sun=1&r=1` (the Sq bulge lit by the actual
-sun). *Verified:* `tests/test_relief_browser.py` (incl. exact-restore
-bit-identity and the uLightDir handoff) + live pass
-(`tests/artifacts/live_relief_crust.png`,
-`live_relief_sunlit_iono.png`).
-
-### Phase v2.7 — unified shell ladder ✅ (approved 2026-06-12, shipped 2026-06-12)
-
-Shipped as designed: one shared `LADDER` in `fetch.py` (surface,
-h100…h1500 — the 0 km slug stays `surface` for permalink stability) for
-every model; core alone keeps its below-surface descent (cmb −2891 km,
-d2500…d500; 22 shells). MMA dropped h2000/re1. As predicted, everything
-downstream (export, manifest, slider union, permalinks, serve day-fetch)
-is spec/manifest-driven and needed no code change. Cache regenerated:
-static, both cached days, and mio-seasonal-2020 — re-materialized on the
-**full 16-shell ladder** (decision 2026-06-12, ~84 MB) so the Seasons tab
-slider matches Daily. No quantization clipping anywhere: iono peaks
-~115 nT at h100 (10 km below the MIO sheet current, which the 100 km
-steps dodge by construction), inside qrange 200. Test sandboxes shrank to
-fit the host's small tmpfs (float32 synthetic npz, raw pruned before
-serving). Demo: `/#f=core,iono,magneto&c=Up&s=h300&t=12:00` — three
-fields summed at a shared altitude, impossible before.
-*Verified:* `test_fetch_unit.py::test_unified_shell_ladder`, full suite
-(65 passed) + live pass (`tests/artifacts/live_v27_h300_sum.png`).
-
-### Phase v2.8 — Seasons terminator: hold the fixed time-of-day ✅ (approved 2026-06-12, shipped 2026-06-12)
-
-The Seasons sun overlay/terminator spun once per weekly interval during
-playback: `displayedUT()` (`web/sun.js`) interpolated *absolute time*
-linearly between epochs. Fixed as designed: new exported `seriesUT()`
-snaps the interpolated offset to whole days whenever consecutive epochs
-are a whole number of days apart (any fixed-time-of-day series), so the
-displayed UT keeps the series' clock time — subsolar longitude holds
-(± equation of time), declination steps daily. Daily tab untouched;
-relief lighting fixed automatically (`uLightDir` derives from the same
-UT). The Seasons timeline label in `web/features/studies.js` now derives
-from the same `seriesUT()` instant (also fixing its latent local-time
-`Date.parse`), so label and sun always agree. Demo:
-`/#tab=seasons&series=mio-seasonal-2020&f=iono&c=Up&s=surface&sun=1`.
-*Verified:* `tests/test_sun_browser.py::test_seasons_terminator_holds_clock`
-(UTC-noon stability, terminator longitude < 5°, label/sun agreement) +
-live pass (`tests/artifacts/live_v28_seasons_sun.png`).
-
-### Phase v2.9 — model families + core SV + interface rethink ✅ (approved 2026-06-12, shipped 2026-06-12)
-
-*Renumbered from v2.5 on 2026-06-12 (human-directed) so the phase ladder
-reads chronologically — v2.6–v2.8 shipped while this one was queued. The
-v2.4 and v2.5 numbers are both retired.*
-
-Human direction 2026-06-12 widens this phase from "family axis + Secular
-tab" to **all three** of the following, together, as one phase — they are
-interlocking, not optional pieces (full designs: IDEAS §9.2, §9.6, §9.7):
-
-- **Model family axis** (IDEAS §9.2): probe `available_models()` first and
-  record results (exact names/validities for IGRF, CHAOS-Core/-Static/
-  -MMA, LCS-1/MF7; whether WDMAM exists in VirES — likely not). Then the
-  `FAMILIES` table in `fetch.py`. **Decision (human, 2026-06-12): the
-  CHAOS family ships without an ionospheric layer — skip "CHAOS-MIO"
-  entirely, no substitute model;** the iono toggle/tab is simply
-  unavailable under CHAOS (grey vs hide is an interface-discussion item).
-- **Core secular variation as a derived field** (IDEAS §9.6): SV in
-  **nT/yr** is computable from VirES outputs by centered finite difference
-  of two MCO evaluations at t ± 6 months — honest given the model's
-  B-spline time basis (confirm MCO_SHA_2C's parameterization in the
-  product doc first); pipeline unchanged (two evals instead of one, Ḃ as
-  NEC tiles; `core-sv` pseudo-field with probed qrange/vmax; manifest
-  `units` key for the colorbar/hover). Units make SV non-summable with nT
-  fields — solved by tab gating, never by a fifth checkbox.
-- **Top-level interface rethink** (IDEAS §9.7): per-source tabs under a
-  page-level model-series selector — e.g. "Daily" → "Combined models", a
-  "Core" tab with a B ↔ dB/dt display toggle, and a "Model series"
-  dropdown above the tab strip starting with Swarm-CI and CHAOS.
-
-**Mandatory checkpoint (human-directed):** implementation of this phase
-must *begin* with an interface design discussion with the human — options
-for the tab strip, the family selector, the B/dB/dt toggle, and the IDEAS
-§9.7 open questions (families missing a layer, permalink mapping) — before
-any code is written. The §9.7 sketch is direction, not a settled design.
-
-**Checkpoint outcome (held 2026-06-12, all four open questions settled):**
-
-1. Tabs: **Combined models** (id `daily`, renamed) · **Core** (new, id
-   `core`) · **Ionosphere** (id `seasons`, relabeled). Ids never change
-   (permalink stability).
-2. **"Model series" dropdown** above the tab strip: Swarm-CI (default) +
-   CHAOS — a page-level lens.
-3. **CHAOS on Combined = curated diurnal series**
-   (`daily-2020-01-01@chaos`); under CHAOS the date picker swaps to a
-   series select. No family dimension in the day cache — family rides
-   inside the series id slug (IDEAS §9.2 storage design unchanged).
-4. Missing layers **grey out + tooltip** ("not part of the CHAOS model
-   series") — both the iono toggle on Combined and the Ionosphere tab.
-5. Core tab timeline = **yearly series 2014–2023** with a B ↔ dB/dt
-   two-way toggle (one displayed field at a time: `core` or `core-sv`;
-   SV never sums with nT fields by construction). Full 22-shell core
-   ladder (v2.7 precedent).
-
-**Probe record (2026-06-12, `docs/v29_model_probe.py` →
-`docs/v29_model_probe.json`; FAMILIES copies from here, not from guesses):**
-
-- Served models confirmed (name → expression, validity):
-  `IGRF` (deg 1–13; 1900-01-01 → 2030-01-01), `'CHAOS-Core'` (deg 1–20;
-  1997-02-07 → 2026-08-08), `'CHAOS-Static'` (deg 21–185; unbounded),
-  `'CHAOS-MMA'` ≡ served composite `'CHAOS-MMA-Primary' +
-  'CHAOS-MMA-Secondary'` (deg 1–2; 2000-01-01 → rolling now), `'LCS-1'`
-  (deg 1–185; unbounded), `MF7` (deg 16–133; unbounded). **WDMAM: not
-  served** (zero matches in `available_models()`, 30 models total) — the
-  crust family alternative is LCS-1/MF7, as IDEAS §9.2 predicted.
-  `CHAOS-MIO` *is* served but is skipped per the 2026-06-12 decision (no
-  ionospheric layer in the CHAOS family).
-- Composed two-model expression evaluates fine via `eval_model`
-  (probe: surface |B| median ≈ 29 nT) — but `'CHAOS-MMA'` is served
-  directly, so FAMILIES uses the alias.
-- SV magnitudes (centered diff at 2018-06-01 ± 6 mo, 1° at CMB):
-  |Ḃ| max ≈ 59 k nT/yr (MCO_SHA_2C), ≈ 71.5 k nT/yr (CHAOS-Core, more
-  small-scale power); surface max ≈ 224, p99 ≈ 196 nT/yr (both models
-  agree at the surface). 1° ≈ 5° values at the CMB — SV is smooth at
-  these degrees. ⇒ **core-sv qrange = 100 000 nT/yr** (1.4× headroom over
-  the strongest case), **vmax = 200 nT/yr** (surface p99). int16 step =
-  3.05 nT/yr ⇒ ~64 display levels at the surface — acceptable; revisit
-  per-shell qrange only if banding offends at live verify.
-- MCO_SHA_2C time basis (CIY4, Sabaka et al. 2018, PMC6425495): core SV
-  on SH degrees 1–16 as **order-4 (cubic) B-splines, 6-month knots**;
-  degrees 17+ static. Not the piecewise-linear basis IDEAS §9.6 guessed —
-  the ±6-month centered difference is therefore a *smoothed* (still
-  honest, O(Δ²)) SV estimate, not an exact knot slope. CHAOS-Core is
-  order-6 splines; IGRF SV would be a 5-year staircase (century series is
-  a later phase anyway).
-
-**Shipped (2026-06-12), all behind flag `families`:** `FAMILIES` table in
-fetch.py ((family, layer) → probe-recorded model spec, aliases stable so
-`B_NEC_<alias>` never changes; the day pipeline never consults it — family
-rides inside curated series ids, `…@chaos`). Derived `core-sv` field
-(centered ±6-mo difference in `_save_snapshot`, `sv_window` clamps to
-per-model validity from validity.json; nT/yr via a manifest `units` key
-that drives colorbar + hover; **no checkbox by construction** — ui.js only
-builds toggles for nT fields; F of SV = |Ḃ|, tooltipped). `SeriesSpec`
-grew `family`, `step_minutes`, `step_years` (calendar stepping),
-`single_step` (one middle-epoch tile — the diurnal series would otherwise
-duplicate core/crust ×97) and `qrange` (per-series storage override:
-**CHAOS-Core reaches degree 20 and peaks 8.41M nT at the CMB**, 2.8× the
-CI-sized core qrange — caught by the export clipping check, stored at 10M
-via `storageQrange()` on both descale paths; CI tiles keep full
-precision). Manifest v3, all additive. Frontend: shader grew a 5th field
-slot (uEnable/uScale became float arrays — Vector4 would have crashed on
-index 4), series membership outranks the static shortcut in fieldDay +
-frameSource (the chaos series' CHAOS-Static crust must never read the MLI
-static tiles), day availability requires per-day stats. studies.js:
-Combined models · Core · Ionosphere (ids unchanged) under `#family-select`;
-per-(tab,family) snapshots; Core tab B ↔ dB/dt radio clears the colorbar
-lock on unit change; grey-outs say *why* ("not part of the CHAOS model
-series"); attribution swaps per family. permalink: `family=` (ci = key
-absent ⇒ old links bit-identical; series wins over family), kind→flag
-gates (annual ⇒ studies, secular/diurnal ⇒ families) so a families-off
-deploy degrades gated links to v1. Materialized: `core-secular`,
-`core-secular@chaos` (yearly ×10, 2014–2023, 22 shells, B + Ḃ),
-`daily-2020-01-01@chaos` (97 × 15-min, single-step core/crust) — tiles now
-1.2 GB, raw 4.7 GB. Demos:
-`/#tab=core&series=core-secular&f=core-sv&c=Up&s=cmb` (SV flux patches at
-the CMB),
-`/#family=chaos&tab=daily&series=daily-2020-01-01@chaos&e=2020-01-01T12:00&f=core,crust,magneto&c=Up&s=h300`,
-`/#tab=core&series=core-secular@chaos&f=core-sv&c=Up&s=cmb`.
-*Verified:* `tests/test_families_browser.py` (12 scenarios, flag on + off,
-zero console errors) + full suite (90 passed) + live pass
-(`tests/artifacts/live_v29_*.png`).
-
-### Phase v2.10 — selector inversion (Field to explore → Model) ✅ (shipped 2026-07-01)
-
-Human-directed UI change: choose the study first. The v2.9 lineup (a "Model
-series" dropdown over a per-source tab strip) becomes two dropdowns — a
-**primary "Field to explore"** select (All / Core / Ionosphere; "All" ≡ the
-former "Combined models") and a **secondary "Model"** select (Swarm CI /
-CHAOS). Field is primary: the Model options grey out where the chosen field
-has no data (e.g. Ionosphere × CHAOS — CHAOS has no ionospheric layer), and
-picking such a field falls the model back to one that has it (`switchField`
-mirrors the old `switchFamily`→`bestField` fallback). Presentation-only: study
-ids (`daily`/`core`/`seasons`) and `state.family` are unchanged, so
-`permalink.js` is untouched and every v2.3–v2.9 link (incl.
-`tab=`/`series=`/`family=`) round-trips bit-identically. The whole change lives
-in `web/features/studies.js` (+ `web/style.css`, an `index.html` comment).
-Demos unchanged from v2.9. *Verified:* `tests/test_families_browser.py` /
-`test_studies_browser.py` rewired to drive `#field-select` (incl. the
-field-primary model fallback + grey-out) + full suite + live browser pass.
-
-### Phase v2.11 — all VirES models + model-info ⓘ ✅ (shipped 2026-07-01)
-
-Every grid-evaluable model VirES serves (probe: `docs/v211_model_probe.json`,
-30 catalog names) is now selectable. **ci and chaos stay the only multi-field
-lenses**; each remaining model is a **single-field family** riding one
-curated series: core — MCO_SHA_2D (`core-secular@mco2d`, yearly 2014–2017,
-its full frozen validity) and IGRF (`core-secular@igrf`, 5-yearly
-**1900–2025**, the full-range century study; core-sv stored at ±150k — the
-1900s CMB |Bdot| tops the 100k default); crust — LCS-1 (±2000 nT storage),
-MF7, MLI_SHA_2D (timeless: the new `kind="static"` 1-epoch/single-step
-series `crust-static@*`, incl. ci/chaos twins); iono — MIO_SHA_2D
-(`mio-seasonal-2020@mio2d`); magneto — MMA_SHA_2F (`daily-2020-01-01@mma2f`).
-The "Field to explore" dropdown gains **Crust** (kind `static`; timebar
-hidden — single epoch) and **Magnetosphere** (kind-less like All, gated to
-its field, so it *reuses* the day cache / the CHAOS day's magneto layer —
-no duplicate data). **Unevaluated by decision, greyed in the dropdown with
-the reason** (2026-07-01): CHAOS-MIO (the 2026-06-12 decision stands), AMPS
-(polar current climatology, not a global field), MLI_SHA_2E (degree 600 ≫
-the 1° grid). Aliases (MCO_SHA_2X, CHAOS, SwarmCI, -Primary/-Secondary
-halves) are covered indirectly. Manifest **v4** (additive): per-field
-`model`/`sv`, per-series `models`, top-level `models` (validity + served
-expression from `--validity`). The **ⓘ model-info modal** (flag `modelinfo`,
-`web/features/model-info.js`, IDEAS §6.2) opens a native `<dialog>` naming
-the served model behind each on-screen layer with degree range, validity,
-grid/cadence/storage, an honest caveat paragraph, and the
-unevaluated/alias footer. `tab=` permalink key is now functional (kind-less
-tabs are indistinguishable from data alone); `fieldVmax` fixed so a series'
-crust uses its own stats, not MLI's; `#timebar[hidden]` CSS fixed; playback
-guards the zero-span single-epoch timeline. Follow-up (user report
-2026-07-03): the grey-out is now **symmetric** — fields the chosen model
-can't serve disable in the Field dropdown (previously picking one silently
-swapped the model back, e.g. All × MMA_SHA_2F offered Crust → Swarm CI).
-Demos:
-`/#tab=core&series=core-secular@igrf&e=1950-06-01T12:00&f=core-sv&c=Up&s=cmb`,
-`/#tab=crust&series=crust-static@lcs1&f=crust&c=Up&s=surface`,
-`/#tab=magneto&series=daily-2020-01-01@mma2f&f=magneto&c=Up&s=h500`.
-*Verified:* fast suites (48) green; live :8212 browser pass 46/46 checks,
-zero console errors (`tests/artifacts/live_v211_*.png`);
-`test_families_browser.py` extended (Crust/Magnetosphere studies,
-unevaluated entries, modal, magneto tab= round-trip).
-
-### Phase v2.12 — reference frames + surface sunlight + defaults refresh ✅ (approved 2026-07-08, implemented 2026-07-08 on branch `frames-and-sunlight`)
-
-IDEAS §1.4 promoted as its two-way subset (human-directed): a global
-**ECEF | ECI** reference-frame control — plain radios, no disclosure nesting,
-no sun-fixed mode yet, though `web/features/frame.js` keeps a FRAMES table +
-one `frameAngle()` so the third mode is a table row when wanted
-(`(180 − subsolarPoint(ut).lon) · DEG`). ECI poses the globe group by the
-mean-solar hour angle from the displayed UT (+Y polar axis, 15°/hr; one
-quaternion poses the globe and the sun lighting — IDEAS §1.4's contract), so
-Daily playback shows the Earth spinning eastward under a sun that holds still
-up to the equation of time (±4°). Permalink `frame=<id>`, written only when
-≠ ecef; unknown ids degrade to ecef (stability contract). Hover picking
-applies the inverse earth quaternion so the readout stays geographic.
-
-Bundled in the same approval:
-
-- **Sun → Sunlight** (flag `sun`, key `sun=`, `#sun-toggle` id all kept): the
-  v2.6 overlay (terminator ring + subsolar glyph) is retired; the toggle now
-  shades the globe surface itself by day/night — object-space `uSunDir` +
-  `uSunlight` uniforms in the field *and* coast fragments (soft ~±5°
-  terminator band, 0.35 night floor), so the terminator reads as a lighting
-  boundary and, being object-space, is rotation-proof under ECI for free.
-  The v2.6 uLightDir handoff (relief hillshade follows the sun while both
-  flags are on) is unchanged in logic, now frame-aware (world sun =
-  earth quaternion × ecef sun).
-- **Defaults refresh**: all four fields on, relief on, sunlight on; shell
-  stays h500, component Up. Permalink learns the off forms `sun=0` / `r=0`
-  (key absent = the new on default; old explicit `=1` links still parse;
-  `f=` already round-trips the full list incl. empty).
-- **Labels/footer**: component radios + hover readout display Northward /
-  Eastward / Upward / Intensity (`N`/`E`/`Up`/`F` stay the architectural keys
-  in `c=`, COMPONENT_MASK, radio values/ids); the attribution line reads
-  "An ESA Swarm project via VirES — …".
-
-v2.6 bit-identity is preserved via the all-off path (`sun=0&r=0`:
-`uSunlight == 0 && uRelief == 0` leaves color untouched); the *default* look
-changes by design. Pre-v2.12 links that never carried `sun=`/`r=` now render
-with both on — absent-means-default is the contract and the defaults moved.
-
-Demos: ECI playback `/#day=2020-01-01&t=00:00&f=iono&c=Up&s=h100&frame=eci`
-(press play: the globe spins, the Sq blob and the night shading hold still);
-v1 look `/#f=crust&c=Up&s=surface&sun=0&r=0`.
-*Verified:* fast suites green (54); browser suites rewritten/re-anchored
-in-tree (`test_frame_browser.py` new; sun suite re-targeted from the retired
-overlay to the uniforms) but not run on this host (SwiftShader sandbox
-timeouts — known); real-data smoke against a checkout serve on :8230 —
-17/17 checks (boot defaults, uniforms, hash normalization with no
-sun=/r=/frame= keys, frame=eci → exactly 90° about +Y at 06:00 UT and back,
-sun=0&r=0 off-forms, zero console errors) + eyeballed screenshots (midnight
-night-side, noon lit, ECI 06:00 with the Americas rotated into view,
-night-dimmed).
-
-**Landing-view tune (2026-07-15, human-directed):** booting at t=00:00 faced
-the viewer at the midnight side — a near-black landing globe. The boot time
-moved to **08:00 UT** (subsolar ~60°E: ~3/4 of the landing disc lit,
-terminator on the Atlantic limb, Sq blob on screen) and the night floor rose
-**0.35 → 0.55** in both fragments so the night side stays clearly readable,
-just darker (worst-case night × relief hillshade 0.30, was 0.19). Fast
-suites stayed green (54); no test pinned either constant.
-
-**:8300 branch-preview browser pass (2026-07-15) — the remaining-before-merge
-list, all green: 28/28 checks, zero pageerror/console.error** across every
-section, real interactions throughout. Boot (t=08:00 hash-normalized, night
-quarter visible & darker than day); ECI playback (timePos advances, pose
-tracks UT at 15°/h with <1° deviation spread, world-space sun drift <0.03
-while the globe spins); relief × night floor (night pixels readable with
-relief on and off); hover under ECI (readout stays geographic — same pixel
-reads 156.2°E under eci vs 0.1°E under ecef); Seasons pose-hold (weekly
-12:00 UT steps: earth angle spread 0°, subsolar-lon spread 0.46°); studies ×
-frame interplay (all five tabs cycled under eci, CHAOS greys the iono
-toggle, back to CI clean); narrow width (420 px: no horizontal scroll, all
-controls visible). Eyeballed: default 3/4-lit landing, ECI mid-play
-world-fixed lighting, Seasons night face at the new floor, narrow layout.
-
-### Beyond (IDEAS-only, not approved)
-
-Storms tab + indices (the `window` series kind, `fetch.py --indices` +
-strip chart, curated storm window bookmarks — IDEAS §9.1/§9.3/§9.4;
-demoted from phase v2.4 on 2026-06-12; the v2.4 and v2.5 numbers stay
-retired (v2.5 was renumbered to v2.9 the same day);
-re-promote on approval). Cross-family comparison series (CHAOS-vs-CI
+On the slate (IDEAS-only, not approved): Storms tab + indices (the `window`
+series kind, `fetch.py --indices` + strip chart, curated storm window
+bookmarks — IDEAS §9.1/§9.3/§9.4; demoted from phase v2.4 on 2026-06-12; the
+v2.4 and v2.5 numbers stay retired — v2.5 was renumbered to v2.9 the same
+day; re-promote on approval). Cross-family comparison series (CHAOS-vs-CI
 diurnal, signed-diff display — IDEAS 2.3/2.6 successors), seasonal decade
 extension (~100 MB), and the pre-studies slate: quick wins (1.1, 5.1, 4.1,
 5.2, 5.3), SH playground satellite page (3.1 + 3.2), sunset review (8.3)
