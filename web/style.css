@@ -370,6 +370,16 @@ fieldset {
 
 #fetch-chip.error { background: #5b1a1a; color: #ffd7d7; }
 
+/* ---- view pane: globe and/or series charts (v2.13); positioned so the
+   ⓘ overlay anchors here and survives the globe hiding in series view ---- */
+#viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* ---- globe ---- */
 #globe {
   position: relative;
@@ -655,3 +665,133 @@ dialog#model-info::backdrop { background: rgba(6, 8, 15, 0.65); }
 }
 
 #model-info a { color: #8fa3cc; }
+
+/* ---- timeline viewer (feature `timeseries`, v2.13) ---- */
+#view-toggle {
+  display: inline-flex;
+  gap: 0.6rem;
+  margin-left: auto;             /* right edge of the header's first row */
+}
+
+#series-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+  border-top: 1px solid #1c2438;
+}
+
+/* display:flex above would beat the UA [hidden] rule (same gotcha as
+   #timebar) — globe view hides the whole panel via the hidden attribute */
+#series-panel[hidden] { display: none; }
+
+body[data-view="series"] #globe { display: none; }
+body[data-view="series"] #series-panel { flex: 1; }
+/* combined: globe keeps flex:1 above, charts take a fixed share below */
+body[data-view="combined"] #series-panel { flex: 0 0 42%; }
+
+#ts-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0.9rem;
+  background: var(--panel);
+  border-bottom: 1px solid #1c2438;
+  font-size: 0.9em;
+}
+
+#ts-datum { display: inline-flex; gap: 0.6rem; }
+
+.ts-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--muted);
+}
+
+#ts-controls input[type="number"] {
+  width: 5.5em;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid #2a3552;
+  border-radius: 4px;
+  padding: 0.15rem 0.3rem;
+}
+
+#ts-pin, #ts-clear {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid #2a3552;
+  border-radius: 4px;
+  height: 1.8rem;
+  cursor: pointer;
+}
+
+#ts-pin:hover, #ts-clear:hover { border-color: var(--accent); }
+
+#ts-snap {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+#ts-conv { display: inline-flex; gap: 0.6rem; }
+
+#ts-status {
+  background: #233055;
+  border-radius: 999px;
+  padding: 0.1rem 0.7rem;
+  font-size: 0.85em;
+}
+
+#ts-status.error { background: #5b1a1a; color: #ffd7d7; }
+
+#ts-hint {
+  margin: auto;                  /* centered in the empty panel */
+  padding: 1rem;
+  color: var(--muted);
+}
+
+#ts-charts {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;              /* tiny windows scroll, charts keep 96px */
+}
+
+#ts-charts[hidden] { display: none; }   /* same [hidden]-vs-flex gotcha */
+
+.ts-chart { flex: 1 1 0; min-height: 96px; position: relative; }
+
+/* the 3rd panel carries the shared 30px x axis: equal grow from bases
+   0/0/30px gives it exactly +30px, i.e. identical plot areas (nth-child,
+   not last-child — the time readout is the container's 4th child) */
+.ts-chart:nth-child(3) { flex: 1 1 30px; }
+
+/* crosshair value, top-right inside each panel (the legend's old job) */
+.ts-value {
+  position: absolute;
+  top: 2px;
+  right: 8px;
+  z-index: 1;
+  pointer-events: none;
+  font-size: 0.75em;
+  color: var(--muted);
+}
+
+/* the shared time readout under the lowest panel: gold = the transport
+   instant (matching the time cursor), muted = the hovered instant */
+#ts-time-readout {
+  flex: none;
+  text-align: center;
+  font-size: 0.8em;
+  color: var(--accent);
+  padding: 0.15rem 0;
+}
+#ts-time-readout.hover { color: var(--muted); }
+
+/* uPlot dark-theme fit: drag-select visibility (legends are disabled) */
+.uplot { font: inherit; }
+.uplot .u-select { background: rgba(143, 163, 204, 0.15); }

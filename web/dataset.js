@@ -49,6 +49,15 @@ export function storageQrange(field, day) {
     ?? manifest.fields[field].qrange_nT;
 }
 
+// The grid a field's tiles at this day/series were evaluated on: a series
+// may override the field default (v2.13 — the quarterly secular series run
+// at 2°). Every tile-sizing site (decode, bilinear, GPU uGrid) must go
+// through this.
+export function storageGrid(field, day) {
+  return manifest.series?.[day]?.grid?.[field]
+    ?? manifest.fields[field].grid;
+}
+
 // The tile sequence a field plays at the current state.day, or null when the
 // field has no data there: {stepped, n: epoch count, shells: [slugs]}. This
 // is the one availability rule shared by rendering, prefetch, hover and the
@@ -119,7 +128,7 @@ export function getTexture(field, shell, day, step) {
     cache.set(url, entry);
     return entry;
   }
-  const [nlon, nlat] = manifest.fields[field].grid;
+  const [nlon, nlat] = storageGrid(field, day);
   const promise = fetch(url).then(async (resp) => {
     if (!resp.ok) throw new Error(`${url}: HTTP ${resp.status}`);
     const i16 = new Int16Array(await resp.arrayBuffer());
@@ -163,11 +172,10 @@ export function prefetch(state, ahead = 6) {
   }
 }
 
-// CPU bilinear readout in nT (full int16 precision), for the hover readout.
-export async function lookup(field, shell, day, step, lat, lon) {
-  const { i16 } = await getTexture(field, shell, day, step);
-  const spec = manifest.fields[field];
-  const [nlon, nlat] = spec.grid;
+// Bilinear kernel over a decoded tile (full int16 precision), shared by the
+// hover readout and the timeline viewer's point sampling.
+function sampleNEC(i16, field, day, lat, lon) {
+  const [nlon, nlat] = storageGrid(field, day);
   const x = (lon + 180) / 360 * (nlon - 1);
   const y = (lat + 90) / 180 * (nlat - 1);
   const x0 = Math.min(Math.floor(x), nlon - 2);
@@ -181,4 +189,31 @@ export async function lookup(field, shell, day, step, lat, lon) {
            + fy * ((1 - fx) * at(y0 + 1, x0) + fx * at(y0 + 1, x0 + 1));
   }
   return out;   // [N, E, C] nT
+}
+
+// CPU bilinear readout in nT (full int16 precision), for the hover readout.
+export async function lookup(field, shell, day, step, lat, lon) {
+  const { i16 } = await getTexture(field, shell, day, step);
+  return sampleNEC(i16, field, day, lat, lon);
+}
+
+// Point sample in nT that never disturbs the texture cache — for the
+// timeline viewer's bulk assembly (feature `timeseries`, v2.13): one
+// 97-epoch sweep through getTexture would flush the 64-entry LRU several
+// times over and churn the globe's own textures. An already-decoded entry
+// is reused without refreshing its LRU position; anything else is fetched
+// raw, sampled, and discarded (no DataTexture, no cache insert).
+export async function samplePoint(field, shell, day, step, lat, lon,
+                                  { signal } = {}) {
+  const url = tileURL(field, shell, day, step);
+  const entry = resolved.get(url);
+  if (entry) return sampleNEC(entry.i16, field, day, lat, lon);
+  const resp = await fetch(url, { signal });
+  if (!resp.ok) throw new Error(`${url}: HTTP ${resp.status}`);
+  const i16 = new Int16Array(await resp.arrayBuffer());
+  const [nlon, nlat] = storageGrid(field, day);
+  if (i16.length !== nlon * nlat * 3) {
+    throw new Error(`${url}: ${i16.length} values, expected ${nlon * nlat * 3}`);
+  }
+  return sampleNEC(i16, field, day, lat, lon);
 }

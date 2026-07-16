@@ -223,11 +223,43 @@ def test_sv_snapshot_is_exact_slope(tmp_path, monkeypatch):
                                np.array([10.0, -20.0, 40.0])), slug
 
 
-def test_core_secular_epochs_no_leap_drift():
-    for sid in ("core-secular", "core-secular@chaos"):
-        epochs = SERIES[sid].epochs()
-        assert len(epochs) == 10
-        assert epochs == [dt.datetime(y, 6, 1, 12) for y in range(2014, 2024)]
+def test_core_secular_epochs_quarterly():
+    # v2.13 addendum: first-of-month noon epochs every 3 months at 2°,
+    # calendar-month arithmetic (no day/leap drift), December rolls the year
+    epochs = SERIES["core-secular"].epochs()
+    assert len(epochs) == 37
+    assert epochs[0] == dt.datetime(2014, 6, 1, 12)
+    assert epochs[-1] == dt.datetime(2023, 6, 1, 12)
+    assert all(e.day == 1 and e.hour == 12 for e in epochs)
+    assert epochs[2] == dt.datetime(2014, 12, 1, 12)
+    assert epochs[3] == dt.datetime(2015, 3, 1, 12)
+    months = [e.year * 12 + e.month for e in epochs]
+    assert all(b - a == 3 for a, b in zip(months, months[1:]))
+
+
+def test_chaos_secular_spans_chaos_core_availability():
+    # CHAOS-Core validity 1997-02-07..2027-02-06 (validity.json): the series
+    # starts at the first first-of-month epoch whose whole ±6-mo SV window
+    # sits inside it; the end stays aligned with the CI series (309 months,
+    # divisible by the 3-month step, so the final epoch lands exactly)
+    epochs = SERIES["core-secular@chaos"].epochs()
+    assert len(epochs) == 104
+    assert epochs[0] == dt.datetime(1997, 9, 1, 12)
+    assert epochs[-1] == dt.datetime(2023, 6, 1, 12)
+    assert all(e.day == 1 and e.hour == 12 for e in epochs)
+    months = [e.year * 12 + e.month for e in epochs]
+    assert all(b - a == 3 for a, b in zip(months, months[1:]))
+
+
+def test_secular_series_grid_override():
+    # v2.13 addendum: the secular series evaluate at 2° (181x91) to keep
+    # their many-epoch fetches cheap; other series keep their field grids
+    for sid in ("core-secular", "core-secular@chaos", "core-secular@mco2d"):
+        for name in ("core", "core-sv"):
+            f = series_field(SERIES[sid], name)
+            assert (f.nlon, f.nlat) == (181, 91), (sid, name)
+    assert series_field(SERIES["core-secular@igrf"], "core").nlon == 361
+    assert series_field(SERIES["mio-seasonal-2020"], "iono").nlon == 181
 
 
 def test_chaos_daily_epochs_match_day_times():
@@ -261,8 +293,9 @@ def test_series_field_family_resolution():
         == FIELDS["core-sv"].qrange                # SV fits the default
     sv = series_field(SERIES["core-secular@chaos"], "core-sv")
     assert sv.model == "Core = 'CHAOS-Core'" and sv.sv
-    # ci series still pass the catalog field through untouched
-    assert series_field(SERIES["core-secular"], "core") is FIELDS["core"]
+    # an override-free series passes the catalog field through untouched
+    # (core-secular no longer qualifies: it carries the 2° grid override)
+    assert series_field(SERIES["mio-seasonal-2020"], "iono") is FIELDS["iono"]
     # a layer missing from the family is a catalog bug, surfaced loudly
     bogus = SeriesSpec(id="x@chaos", kind="annual", label="x",
                        fields=("iono",), family="chaos",
@@ -322,11 +355,14 @@ def test_igrf_century_epochs():
 
 
 def test_mco2d_epochs_inside_validity():
-    # MCO_SHA_2D validity 2013-11-25..2018-01-01 (probe): June-1 epochs
-    # keep every ±6-month SV window inside it
+    # MCO_SHA_2D validity 2013-11-25..2018-01-01 (probe): first-of-month
+    # epochs 2014-06..2017-06 keep every ±6-month SV window inside it
     s = SERIES["core-secular@mco2d"]
-    assert s.epochs() == \
-        [dt.datetime(y, 6, 1, 12) for y in range(2014, 2018)]
+    epochs = s.epochs()
+    assert len(epochs) == 13                       # quarterly, v2.13 addendum
+    assert epochs[0] == dt.datetime(2014, 6, 1, 12)
+    assert epochs[-1] == dt.datetime(2017, 6, 1, 12)
+    assert all(e.day == 1 and e.hour == 12 for e in epochs)
     # probe: CMB |B| max 7.67M needs the CHAOS-size storage range
     assert series_field(s, "core").qrange == 10_000_000.0
     assert series_field(s, "core-sv").qrange == FIELDS["core-sv"].qrange

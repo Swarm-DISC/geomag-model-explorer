@@ -5,8 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Geomag Model Explorer — geomagnetic field globe</title>
 <link rel="stylesheet" href="./style.css">
+<link rel="stylesheet" href="./vendor/uPlot.min.css">
 <script type="importmap">
-  {"imports": {"three": "./vendor/three.module.js"}}
+  {"imports": {"three": "./vendor/three.module.js",
+               "uplot": "./vendor/uPlot.esm.js"}}
 </script>
 </head>
 <body>
@@ -37,6 +39,9 @@
   </div>
 </header>
 
+<!-- view pane: the globe and (v2.13) the series charts; overlay anchor
+     for the ⓘ button, which must survive the globe hiding in series view -->
+<div id="viewport">
 <main id="globe">
   <!-- layer 3: how it is drawn — floating box, top-left of the globe
        (component here; sun/relief fill #slot-flags, frame fills #slot-frame) -->
@@ -75,6 +80,7 @@
   </div>
   <div id="error" hidden></div>
 </main>
+</div>
 
 <footer id="timebar">
   <button id="play-btn" aria-label="play/pause">⏵</button>

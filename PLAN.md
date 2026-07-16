@@ -70,8 +70,10 @@ the Heimdall :8300 portal serve the checkout's exported data via
 Carried forward — still open, not yet decisions:
 
 - **Disk policy** (v1 §9.3): cached days accumulate forever — on the v2.7
-  ladder ~320 MB/day tiles + ~1.3 GB/day raw npz (current cache: 1.2 GB
-  tiles, 4.7 GB raw after the v2.9 series; ~93 GB free). Rung 1 (drop `data/raw/` after export)
+  ladder ~320 MB/day tiles + ~1.3 GB/day raw npz (current cache: 2.0 GB
+  tiles, 8.2 GB raw after the v2.11 families; ~57 GB free — the v2.13
+  quarterly-core addendum adds only ~2.6 GB raw + ~0.7 GB tiles per data
+  root). Rung 1 (drop `data/raw/` after export)
   was considered with v2.7 and **deferred 2026-06-12**: raw retains
   re-export flexibility (qrange/format changes without refetching) and the
   disk has headroom. The scaling ladder, in order, architecture unchanged
@@ -99,17 +101,204 @@ Carried forward — still open, not yet decisions:
 
 ## 3. Next phases
 
-One phase approved below. [`IDEAS.md`](./IDEAS.md) is the candidate backlog;
-items are promoted into numbered phases here only on human approval, with the
-decision date recorded. (v2.13, the timeline viewer, is approved and verified
-on its own branch `timeline-viewer`, not yet merged — its spec lives in that
-branch's PLAN.md; the number stays claimed.)
+Two phases are recorded below: v2.13 (this branch — awaiting merge, which
+publishes) and v2.14 (merged to `main` 2026-07-16; this branch now builds on
+it). [`IDEAS.md`](./IDEAS.md) is the candidate backlog; items are promoted
+into numbered phases here only on human approval, with the decision date
+recorded.
+
+### Phase v2.13 — Timeline viewer (time series at a pinned location)
+
+**Approved 2026-07-15** (direct user request, so the RULES §8 human-review
+gate is satisfied by construction; the nearest prior thinking was IDEAS §4.5's
+pinned-probe sparkline). Branch: `timeline-viewer` — **implemented and
+browser-verified 2026-07-15**, awaiting merge (which publishes).
+
+**Why.** The globe answers *where*; nothing answers *when* at a fixed place.
+A pinned point plus three stacked component charts over the active timeline
+turns every already-exported day and series into a virtual-observatory
+record — assembled from local tiles only, no new VirES traffic.
+
+**Shape.** Feature flag `timeseries` → `web/features/timeseries.js`. A
+**Globe | Time series | Combined** view toggle in the header (Combined splits
+over/under: globe above, charts below, shared timebar). Pin a point by
+clicking the globe (click ≠ drag) or typing coordinates — geocentric
+lat/lon/radius or WGS84 geodetic lat/lon/height (`web/geodesy.js`, new pure
+module). Three chart panels: shared x = the active timeline's epochs (UT),
+independent y per component, crosshair-synced, one x axis aligned across
+the stack (labels on the bottom panel; no drag-zoom — see the post-addendum
+fixes), a current-time cursor tracking `state.pos`, click-to-seek. A convention toggle relabels and
+re-signs the stored NEC sums: **N/E/Up** (N, E, −C) | **R/θ/φ** (−C, −N, E) |
+**NEC** (N, E, C). Charts are drawn with **uPlot 1.6.32, vendored** into
+`web/vendor/` (ESM + css, importmap key `uplot`, provenance in
+`web/vendor/VERSION`) — the RULES §6 no-build/no-CDN pattern, decision
+recorded here.
+
+**Contract & invariants.**
+- The chart plots exactly what the globe shows: the sum over
+  enabled-and-available fields (`hooks.frameSource`) at `state.shell`,
+  bilinear at the pin — same tile URLs (`tileURL`/`fieldDay`), same qrange
+  descale, full int16 precision, for every epoch of the active timeline.
+- No network beyond the app's own `./data/` tiles (RULES §3 untouched).
+- Coordinates: native = geocentric (that is what the tiles are). Geodetic
+  input converts via WGS84 before sampling; plotted components remain
+  geocentric-NEC relabelings (no geodetic NED rotation).
+- The pinned point rides the globe's shell: a typed radius/height snaps to
+  the nearest available shell and moves the existing shell slider, so the
+  globe, hover readout and charts can never disagree. The snapped shell (and
+  its geodetic equivalent) is echoed back; geocentric is authoritative.
+- Series assembly is texture-LRU-neutral (`dataset.cacheSize()` unchanged),
+  cancels stale runs (AbortController + sequence guard), caches results per
+  (day|shell|fields|point), renders missing tiles as gaps, and samples
+  non-stepped fields once per assembly. Within a day, core/crust plot flat —
+  that is the data, not a bug.
+- Permalink keys: `view=` (≠ globe), `pt=<lat>,<lon>` (geocentric, 2 dp),
+  `ptc=` (≠ neu). Absent = default, unknown values ignored (the existing
+  stability contract); a flag-off deploy never writes them.
+- Flag off ⇒ byte-identical v2.12 behavior (no toggle, no panel, no keys).
+
+**Verification.** `tests/test_timeseries_browser.py` (stub-server pattern,
+zero pageerror/console.error, incl. a flag-off port): view toggle, click-vs-
+drag pinning + marker, geodetic snap, charts-match-`lookup()`, convention
+sign flips, LRU neutrality + cancellation, permalink round-trip. Then a
+real-data pass on the Heimdall :8300 branch preview (diurnal Sq at a
+mid-latitude pin; `core-secular` and `mio-seasonal-2020` for multi-epoch
+variation) before merge.
+
+*Verified 2026-07-15*: 10/10 new browser tests green (22 s, :8224/:8225);
+fast suites 54 green; permalink suite 5 green after fixing a stale
+pre-v2.12 expectation (garbage-hash default pos is 32 since the boot-time
+tune — it fails on `main` too). Real-data preview pass: Niemegk-ish surface
+pin shows the Sq wiggle (N-range 11 nT, mean N 18.6 μT) over flat
+core/crust; `core-secular` charts 10 yearly nT/yr epochs at the CMB;
+`mio-seasonal-2020` charts 53 weekly epochs; linked x-zoom, click-to-seek
+and geodetic snapping all exercised (screenshots
+`tests/artifacts/live_v213_*.png`). One layout fix landed en route: the
+shared x axis is drawn only on the bottom panel, or combined mode collapses
+the plot areas to zero height. Host finding for MAINTENANCE: every
+pre-v2.13 browser suite's fixed ports (8213–8223) are now occupied by
+unrelated fleet services, so those suites silently probe foreign servers
+and time out — port allocation needs a rework (the new suite sits on the
+free 8224/8225).
+
+*Updated onto the v2.14 `main`, 2026-07-16*: merged `main` into this branch
+(sole conflict: this file's §3 — both phase records kept) and landed the
+v2.14-prescribed follow-up — `#globe` and `#series-panel` now live inside a
+static `#viewport` (position anchor for the ⓘ overlay), so the button
+survives the globe hiding in series view; the panel appends into `#viewport`
+and the combined split is 42% of the view pane. Suite repairs along the way,
+none v2.13-specific: sun and relief moved off the dead 8213–8223 ports to
+8234–8237 and day-pick to 8238 (the host finding above — all three failed on
+every branch); day-pick additionally needed the shared foundry token wired in
+(stub-server secret + pre-cached localStorage, the deployed shape) — the
+REVIEW #6 fail-closed gate had silently broken it while its port was dead,
+on `main` too (confirmed against a clean `main` worktree). Full suite green
+post-update: 128 passed, 1 skipped. A fresh real-data :8300 preview pass on
+the updated branch remains the gate before this branch merges to `main`.
+
+**Scope addendum (approved 2026-07-16, direct user request).** Five pre-merge
+refinements to the charts and the Core timeline:
+
+1. The per-chart uPlot legends go away; the component name moves to a rotated
+   y-axis label (canvas-drawn in the axis stroke colour — `series[1].label`
+   stays, now purely a test seam) and reads as a rate (e.g. `dB_θ/dt`,
+   `nT/yr`) whenever the Core B ↔ dB/dt toggle has SV displayed.
+2. Span-adaptive single-line UTC x-tick labels: years at year ticks, month
+   names carrying the year at January and the first visible tick, day labels
+   likewise, HH:MM with the ISO date at the first tick on sub-day spans. The
+   axis stays 30 px — two-line labels rejected for the combined-mode vertical
+   budget.
+3. Hover values move into a compact in-plot readout per chart; one
+   bottom-centre time readout below the lowest panel shows the crosshair
+   instant, falling back to the transport instant (gold, matching the time
+   cursor) when the pointer leaves the charts.
+4. **Core sampling densifies — quarterly at 2°**: `core-secular`,
+   `core-secular@chaos` and `core-secular@mco2d` switch from yearly/1° to
+   3-month epochs on a 2° grid, via a new `SeriesSpec.step_months` and a
+   per-series `grid` override (same pattern as `qrange`);
+   `core-secular@igrf` stays 5-yearly at 1° (piecewise-linear generations —
+   denser epochs would only interpolate). The addendum's first cut was
+   monthly at 1° — a real CI fetch verified end-to-end, but the fleet-wide
+   fetch clocked ~7 h and the user revised the resolution down the same
+   day (2° spatial, once per 3 months). And (user directive, same day)
+   `core-secular@chaos` expands to CHAOS-Core's own availability —
+   1997-09-01..2023-06-01 — since the Core component is valid far wider
+   (1997-02-07..2027-02-06) than the rest of CHAOS; 1997-09-01 is the
+   first first-of-month epoch with a whole ±6-mo SV window. Epoch counts:
+   37 (CI) / 104 (@chaos) / 13 (@mco2d).
+5. Data notes for (4): series raw npz are step-index-keyed (`t{step:03d}`)
+   and grid-unaware, so a cadence or grid change invalidates
+   `data/raw/series/<id>` wholesale — delete before re-fetch. Cost ~462
+   stacked 2° evals (tens of minutes, resumable), ~2.6 GB raw + ~0.7 GB
+   tiles per data root — no disk pressure. Old `e=` permalinks survive
+   (`nearestEpoch` is instant-based). Pre-merge verification runs against a
+   scratch data root (`GEOMAG_MODEL_EXPLORER_DATA`) + local serve on :8240,
+   leaving the worktree's symlinked shared data untouched. Post-merge ops,
+   per series, in the primary checkout AND the :8212 service root
+   (`~/.local/share/geomag-model-explorer-deploy`): delete stale
+   `data/raw/series/<id>`, hardlink-copy the scratch raw in, no-op
+   `fetch.py --series` (upserts MANIFEST.toml provenance) +
+   `export.py --series`, commit MANIFEST.toml, restart the service.
+
+*Addendum verified 2026-07-16.* Suites: 5 new/updated browser tests
+(chart chrome, adaptive x labels incl. the year-rollover rule, readouts,
+37-epoch quarterly timeline) — timeseries 13, families 18 green on the
+quarterly 2° stubs; fetch/export units 55 green (incl. the grid-override
+and step_months epoch tests). Real-data passes: (a) :8300 branch preview,
+16/16 scripted chrome checks + the weekly `mio-seasonal-2020` month-label
+look, zero console errors (`live_v213_addendum_*.png`); (b) a local
+scratch-root server on :8240 (`GEOMAG_MODEL_EXPLORER_DATA`, worktree rules
+untouched) with freshly fetched quarterly 2° data — 11/11 checks per
+family: CI 37 epochs, @chaos 104 (1997–2023, year ticks every 2 years),
+@mco2d 13 (`live_v213_quarterly_*.png`). Two real defects were caught by
+these passes and fixed en route: series tiles were sized from
+`manifest.fields` everywhere (2° tiles threw "49413 values, expected
+196023") — fixed by the per-series manifest `grid` map +
+`dataset.storageGrid()`; and quarter-spaced ticks rolled the year
+silently past Dec → Mar — fixed by the year-on-rollover rule. The whole
+quarterly fetch ran 46 min against VirES (vs ~7 h projected for the
+monthly/1° first cut, which was verified end-to-end and then superseded).
+Full suite: 131 passed, 1 skipped; `test_serve_api::test_queue_orders_
+and_reports` flakes under heavy fetch load only (passes on a quiet box —
+pre-existing timing sensitivity, not a v2.13 change). Post-merge ops as
+recorded in the addendum: propagate the scratch raw (hardlink) + export
+into the primary checkout and the :8212 service root, commit
+MANIFEST.toml, restart, then `rm -rf /var/tmp/geomag-core-monthly`.
+
+*Post-addendum chart fixes (2026-07-16, direct user request).* Two panel
+fixes before merge. (1) The three panels now share one aligned x grid:
+uPlot auto-pads the right edge by 25 px only on panels whose bottom axis
+has nonzero *size* (`calcPlotRect` counts a side only when
+`_size + labelSize > 0`), so the lone labeled bottom panel sat 25 px
+narrower — its data and gridlines shifted against the panels above. The
+x axis (with its vertical gridlines) is now drawn on all three panels —
+labels and tick marks bottom-only, size 0 above, so the combined-mode
+flex calibration holds — and the right padding is pinned to the same 25
+on all three, since the size-0 axes still don't count toward uPlot's
+auto-padding. (2) Drag-select x-zoom is disabled (`cursor.drag.x =
+false`) — area-select was a user cut; programmatic `setScale` stays as
+the tests' span seam, still propagated across panels by `syncXScale`.
+Verified: timeseries 15 green (panel alignment — equal bbox, identical
+splits, bottom-only labels — and no-zoom-on-drag added); full suite 135
+passed, 1 skipped — the serve_api queue test's one failure was tmpfs
+ENOSPC (`/tmp` 4.9G; pytest keeps the last 3 ~1 GB sandbox generations,
+two of them stale from a killed session — a second flake cause besides
+load, cleaned and green on rerun). Scripted :8300 preview pass 7/7 on
+real data (`live_v213_fixes_*.png`; code hot-copied into the running
+preview container — a rebuild would drop its fetched data).
+
+**Out of scope** (this phase): per-field traces, radial interpolation between
+shells, geodetic NED component rotation, CSV export, multi-day stitching,
+plotting at radii off the shell ladder, pausing the hidden globe render.
+
+---
 
 ### Phase v2.14 — Interface reorganization (three control layers)
 
 **Approved 2026-07-15** (direct user request; RULES §8 gate satisfied by
 construction). Branch: `interface-improve`, from `main`/v2.12 by explicit
-user decision — NOT stacked on the unmerged `timeline-viewer`.
+user decision — NOT stacked on the unmerged `timeline-viewer`. **Merged to
+`main` 2026-07-16**; this branch now builds on it.
 
 **Why.** The header grew one control at a time (v2.9–v2.12): two dropdowns,
 four checkbox/radio groups and three display toggles share two

@@ -177,6 +177,9 @@ def export_series(series_id: str) -> None:
         # the storage range each field's tiles were quantized with — may
         # override the field default (CHAOS-Core at the CMB needs ~3x)
         "qrange_nT": {name: f.qrange for name, f in sfields.items()},
+        # the grid each field's tiles were evaluated on — may override the
+        # field default (the quarterly secular series run at 2°, v2.13)
+        "grid": {name: [f.nlon, f.nlat] for name, f in sfields.items()},
         "epochs": [e.isoformat() for e in epochs],
         "fixed_time": series.fixed_time.strftime("%H:%M"),
         "shells": {name: list(f.shells) for name, f in sfields.items()},

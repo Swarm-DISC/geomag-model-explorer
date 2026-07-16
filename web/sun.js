@@ -10,8 +10,9 @@ const DAY_MS = 86400000;
 
 // Epochs in the manifest carry no zone designator and mean UT; bare
 // Date.parse would read them as *local* time (ES spec) and shift the sun
-// by the host timezone.
-function parseUT(iso) {
+// by the host timezone. Exported (v2.13) so the timeline viewer builds its
+// chart time axis from the same instants.
+export function parseUT(iso) {
   return Date.parse(/[Zz]|[+-]\d{2}:\d{2}$/.test(iso) ? iso : iso + 'Z');
 }
 

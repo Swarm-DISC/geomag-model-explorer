@@ -12,11 +12,32 @@ export const COMPONENT_LABELS = {
 };
 export const R_SURFACE_M = 6371000;
 
-function shellLabel(slug, radiusM) {
+export function shellLabel(slug, radiusM) {
   if (slug === 'cmb') return 'CMB −2891 km';
   const altKm = Math.round((radiusM - R_SURFACE_M) / 1000);
   if (altKm === 0) return 'surface';
   return altKm > 0 ? `+${altKm} km` : `−${-altKm} km`;
+}
+
+// Shell ladder: union of the enabled fields' radii (all fields' if none
+// on). Module-scope (v2.13) so features/timeseries.js snaps typed radii
+// against the very ladder the slider offers.
+export function shellUnion(state, manifest, hooks) {
+  const on = Object.entries(state.enabled)
+    .filter(([, v]) => v).map(([f]) => f);
+  const fields = on.length ? on : Object.keys(manifest.fields);
+  const byRadius = new Map();
+  for (const f of fields) {
+    // a series may carry a shell subset; fields without data here keep
+    // their full ladder (they are disabled by the toggles, not the slider)
+    const subset = hooks.frameSource(f)?.shells;
+    for (const [slug, r] of Object.entries(manifest.fields[f].shells)) {
+      if (subset && !subset.includes(slug)) continue;
+      byRadius.set(r, slug);
+    }
+  }
+  return [...byRadius.entries()].sort((a, b) => a[0] - b[0])
+    .map(([r, slug]) => [slug, r]);
 }
 
 export function fmtTime(minutes) {
@@ -95,26 +116,8 @@ export function initUI(state, manifest, hooks, timeline) {
   const shellLabelEl = $('shell-label');
   let shellRadii = [];   // [[slugOrNull, radius_m], ...] ascending
 
-  function shellUnion() {
-    const on = Object.entries(state.enabled)
-      .filter(([, v]) => v).map(([f]) => f);
-    const fields = on.length ? on : Object.keys(manifest.fields);
-    const byRadius = new Map();
-    for (const f of fields) {
-      // a series may carry a shell subset; fields without data here keep
-      // their full ladder (they are disabled by the toggles, not the slider)
-      const subset = hooks.frameSource(f)?.shells;
-      for (const [slug, r] of Object.entries(manifest.fields[f].shells)) {
-        if (subset && !subset.includes(slug)) continue;
-        byRadius.set(r, slug);
-      }
-    }
-    return [...byRadius.entries()].sort((a, b) => a[0] - b[0])
-      .map(([r, slug]) => [slug, r]);
-  }
-
   function refreshShellSlider() {
-    shellRadii = shellUnion();
+    shellRadii = shellUnion(state, manifest, hooks);
     shellSlider.max = String(shellRadii.length - 1);
     let idx = shellRadii.findIndex(([slug]) => slug === state.shell);
     if (idx < 0) {                 // current shell gone: snap to nearest

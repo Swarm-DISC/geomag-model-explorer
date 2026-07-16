@@ -1,11 +1,11 @@
 """Relief feature (PLAN v2.6 step B; on by default since v2.12) against a
-sandboxed server (:8220) with the flag on: the Relief checkbox displaces the
+sandboxed server (:8236) with the flag on: the Relief checkbox displaces the
 surface (canvas changes, the silhouette gains/loses pixels) and untoggling
 restores the exact previous pixels (uRelief == 0 is bit-identical); the off
 state round-trips as r=0 (absent = on; the pre-v2.12 r=1 still parses;
 garbage ignored); playback runs with relief on; and with the sun flag also
 on, enabling Sunlight re-lights the relief (the uLightDir handoff).
-Flag-off (:8221, same data) shows no checkbox and never displaces."""
+Flag-off (:8237, same data) shows no checkbox and never displaces."""
 from __future__ import annotations
 
 import json
@@ -21,8 +21,8 @@ import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 ARTIFACTS = Path(__file__).parent / "artifacts"
-PORT_ON = 8220
-PORT_OFF = 8221
+PORT_ON = 8236
+PORT_OFF = 8237
 SEED_DAY = "2020-01-01"
 TIMEOUT_MS = 120_000
 

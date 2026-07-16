@@ -242,6 +242,9 @@ def test_export_single_step_series_end_to_end(sandbox):
     # tiles carry the series' storage range, not the field default
     assert rec["qrange_nT"]["core"] == 10_000_000.0
     assert rec["qrange_nT"]["magneto"] == fetch.FIELDS["magneto"].qrange
+    # and the series' grid (this one has no override: field defaults)
+    assert rec["grid"]["core"] == [361, 181]
+    assert rec["grid"]["magneto"] == [181, 91]
     assert len(rec["epochs"]) == 97
     assert rec["epochs"][0] == "2020-01-01T00:00:00"
     assert rec["epochs"][-1] == "2020-01-02T00:00:00"

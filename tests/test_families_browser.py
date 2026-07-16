@@ -14,7 +14,8 @@ studies still on) shows no Model dropdown and degrades secular/diurnal
 series links to v1 (F6).
 
 The sandbox lives in /var/tmp (disk, not the host's 4.9G /tmp tmpfs): the
-seeded tiles — a full day + five series — are ~920 MB."""
+seeded tiles — a full day + five series — are ~920 MB (core-secular is
+quarterly at 2° since the v2.13 addendum)."""
 from __future__ import annotations
 
 import json
@@ -266,8 +267,8 @@ def test_core_tab_b_dbdt_toggle(servers, watched_page):
     assert page.is_checked("#sv-b")
     assert page.text_content("#fields-label") == "Field to show"
     assert page.evaluate("() => window.geomagModelExplorer.state.enabled.core")
-    # yearly transport: 10 epochs × 10 ticks, dated label
-    assert page.get_attribute("#time-slider", "max") == "90"
+    # quarterly transport (v2.13 addendum): 37 epochs × 10 ticks, dated label
+    assert page.get_attribute("#time-slider", "max") == "360"
     assert page.text_content("#time-label") == "2014-06-01"
     assert "nT" in page.text_content("#colorbar-max")
     assert "nT/yr" not in page.text_content("#colorbar-max")

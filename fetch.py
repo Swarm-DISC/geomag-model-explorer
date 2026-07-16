@@ -194,6 +194,9 @@ class SeriesSpec:
                                # overrides step_days
     step_years: int = 0        # >0: calendar-year steps (no leap drift);
                                # overrides step_days
+    step_months: int = 0       # >0: calendar-month steps (day-of-month kept
+                               # from start; day-1 anchors never overflow);
+                               # overrides step_days
     single_step: tuple[str, ...] = ()  # fields evaluated once, at the middle
                                # epoch, instead of at every epoch (a diurnal
                                # series would otherwise tile core x97 and
@@ -202,6 +205,10 @@ class SeriesSpec:
                                # override for this series' tiles (CHAOS-Core
                                # reaches degree 20: its CMB |B| peaks ~8.4M
                                # nT, 2.8x the CI-sized field default)
+    grid: tuple[int, int] | None = None  # (nlon, nlat) override for every
+                               # field this series evaluates — the secular
+                               # series run at 2° (181x91) to keep their
+                               # many-epoch fetches cheap (v2.13 addendum)
 
     def epochs(self) -> list[dt.datetime]:
         out = []
@@ -211,6 +218,9 @@ class SeriesSpec:
             out.append(cur)
             if self.step_years:
                 cur = cur.replace(year=cur.year + self.step_years)
+            elif self.step_months:
+                m = cur.month - 1 + self.step_months
+                cur = cur.replace(year=cur.year + m // 12, month=m % 12 + 1)
             elif self.step_minutes:
                 cur += dt.timedelta(minutes=self.step_minutes)
             else:
@@ -236,21 +246,30 @@ SERIES: dict[str, SeriesSpec] = {
         fields=("iono",),
         start=dt.date(2020, 1, 1), end=dt.date(2020, 12, 31),
         step_days=7, fixed_time=dt.time(12)),
-    # v2.9 Core tab: B and dB/dt on the same yearly timeline. June 1 keeps
-    # every t ± 6 mo SV window inside CI validity except 2023's upper edge,
-    # which sv_window clamps by about a day (span ~0.997 yr).
+    # v2.9 Core tab: B and dB/dt on the same timeline — quarterly at 2°
+    # since the v2.13 addendum (yearly at 1° before; the addendum's first
+    # monthly/1° cut was revised down for fetch cost, user 2026-07-16).
+    # First-of-month noon epochs keep every t ± 6 mo SV window inside CI
+    # validity except the final 2023-06-01 epoch, which sv_window clamps by
+    # about a day (span ~0.997 yr).
     "core-secular": SeriesSpec(
         id="core-secular", kind="secular",
-        label="Core field & secular variation — yearly, 2014–2023 (Swarm CI)",
-        fields=("core", "core-sv"),
+        label="Core field & secular variation — quarterly, 2014–2023 (Swarm CI)",
+        fields=("core", "core-sv"), grid=(181, 91),
         start=dt.date(2014, 6, 1), end=dt.date(2023, 6, 1),
-        step_days=0, step_years=1, fixed_time=dt.time(12)),
+        step_days=0, step_months=3, fixed_time=dt.time(12)),
+    # CHAOS-Core is available far beyond the other CHAOS components
+    # (validity 1997-02-07..2027-02-06 — see data/validity.json), so its
+    # secular series spans that availability (user request 2026-07-16):
+    # 1997-09-01 is the first first-of-month epoch whose whole ±6-mo SV
+    # window sits inside validity; the end stays aligned with the CI series
+    # (309 months from 1997-09, divisible by 3 — the last epoch is exact).
     "core-secular@chaos": SeriesSpec(
         id="core-secular@chaos", kind="secular",
-        label="Core field & secular variation — yearly, 2014–2023 (CHAOS)",
-        fields=("core", "core-sv"), family="chaos",
-        start=dt.date(2014, 6, 1), end=dt.date(2023, 6, 1),
-        step_days=0, step_years=1, fixed_time=dt.time(12),
+        label="Core field & secular variation — quarterly, 1997–2023 (CHAOS)",
+        fields=("core", "core-sv"), family="chaos", grid=(181, 91),
+        start=dt.date(1997, 9, 1), end=dt.date(2023, 6, 1),
+        step_days=0, step_months=3, fixed_time=dt.time(12),
         qrange={"core": 10_000_000.0}),   # CMB |B| max 8.41M (export check)
     # v2.9 Combined-models tab under the CHAOS lens: one curated day at the
     # day cache's own cadence (97 x 15 min; t96 = next-day 00:00, mirroring
@@ -317,10 +336,10 @@ SERIES: dict[str, SeriesSpec] = {
     # storage range.
     "core-secular@mco2d": SeriesSpec(
         id="core-secular@mco2d", kind="secular",
-        label="Core field & secular variation — yearly, 2014–2017 (MCO_SHA_2D)",
-        fields=("core", "core-sv"), family="mco2d",
+        label="Core field & secular variation — quarterly, 2014–2017 (MCO_SHA_2D)",
+        fields=("core", "core-sv"), family="mco2d", grid=(181, 91),
         start=dt.date(2014, 6, 1), end=dt.date(2017, 6, 1),
-        step_days=0, step_years=1, fixed_time=dt.time(12),
+        step_days=0, step_months=3, fixed_time=dt.time(12),
         qrange={"core": 10_000_000.0}),
     # Time-varying single-field models mirror their field's existing series
     # shape: the ionosphere's weekly-noon year, the magnetosphere's 15-min
@@ -340,18 +359,19 @@ SERIES: dict[str, SeriesSpec] = {
 }
 
 # Container-startup fetch order (deploy/entrypoint.sh): cheap first, so the
-# UI gains families early — the five one-eval statics, then the short
-# secular runs, then the 97-epoch diurnals and weekly years, with the
-# 26-epoch IGRF century (core + sv = 78 stacked evals) last. Must stay a
-# permutation of SERIES (unit-tested).
+# UI gains families early — the five one-eval statics, the small quarterly
+# 2° secular runs (39 / 111 stacked evals), then the 97-epoch diurnals and
+# weekly years, the 26-epoch IGRF century (core + sv = 78 stacked 1° evals),
+# and the 104-epoch CHAOS-Core-availability quarterly run (312 evals) last.
+# Must stay a permutation of SERIES (unit-tested).
 STARTUP_SERIES_ORDER: tuple[str, ...] = (
     "crust-static", "crust-static@chaos", "crust-static@lcs1",
     "crust-static@mf7", "crust-static@mli2d",
-    "core-secular@mco2d",
-    "core-secular", "core-secular@chaos",
+    "core-secular@mco2d", "core-secular",
     "daily-2020-01-01@chaos", "daily-2020-01-01@mma2f",
     "mio-seasonal-2020", "mio-seasonal-2020@mio2d",
     "core-secular@igrf",
+    "core-secular@chaos",
 )
 
 
@@ -366,6 +386,8 @@ def series_field(series: SeriesSpec, field_name: str) -> FieldSpec:
     qrange = (series.qrange or {}).get(field_name)
     if qrange:
         field = replace(field, qrange=qrange)
+    if series.grid:
+        field = replace(field, nlon=series.grid[0], nlat=series.grid[1])
     subset = (series.shells or {}).get(field_name)
     if not subset:
         return field
@@ -640,6 +662,7 @@ def fetch_series(series_id: str, progress_file: Path | None = None,
 
     step_desc = (f"{series.step_minutes}min" if series.step_minutes
                  else f"{series.step_years}y" if series.step_years
+                 else f"{series.step_months}mo" if series.step_months
                  else f"{series.step_days}d")
     entries = {}
     for field_name, paths in done_paths.items():

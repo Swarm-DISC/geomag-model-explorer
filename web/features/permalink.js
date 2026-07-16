@@ -23,6 +23,10 @@
 //   (+ &frame=<id> while the reference frame ≠ ecef — restored by
 //      features/frame.js, same flag-gating; absent = ecef, so pre-v2.12
 //      links stay Earth-fixed)
+//   (+ &view=<id> while the timeline viewer shows ≠ globe, &pt=<lat>,<lon>
+//      while a point is pinned (geocentric, 2 dp) and &ptc=<id> while its
+//      convention ≠ neu — restored by features/timeseries.js (v2.13), same
+//      flag-gating: a timeseries-off deploy never writes or reads them)
 
 const DEBOUNCE_MS = 300;
 
@@ -184,6 +188,16 @@ export function attach({ state, manifest, globe, hooks, onChange }) {
     if (!state.relief) pairs.r = '0';
     if (state.frame && state.frame !== 'ecef') {   // v2.12; ecef = absent,
       pairs.frame = state.frame;                   // so old links stay stable
+    }
+    // timeline viewer (v2.13): all three keys mark deviations from the
+    // defaults, and state.view stays undefined on a timeseries-off deploy
+    if (state.view && state.view !== 'globe') pairs.view = state.view;
+    if (state.point) {
+      pairs.pt =
+        `${state.point.lat.toFixed(2)},${state.point.lon.toFixed(2)}`;
+    }
+    if (state.tsConvention && state.tsConvention !== 'neu') {
+      pairs.ptc = state.tsConvention;
     }
     return '#' + Object.entries(pairs).map(([k, v]) => `${k}=${v}`).join('&');
   }

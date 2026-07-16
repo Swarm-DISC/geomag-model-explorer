@@ -1,7 +1,8 @@
 // Bootstrap: manifest -> textures -> globe -> UI; render-on-demand rAF loop.
 import * as THREE from 'three';
 import { loadManifest, getTexture, getTextureSync, setDecodeHook, prefetch,
-         cacheSize, lookup, frameSource, storageQrange } from './dataset.js';
+         cacheSize, lookup, frameSource, storageQrange,
+         storageGrid } from './dataset.js';
 import { createGlobe } from './globe.js';
 import { FIELD_INDEX } from './shaders.js';
 import { initUI, fmtTime, COMPONENT_LABELS, R_SURFACE_M } from './ui.js';
@@ -69,6 +70,9 @@ const FEATURE_MODULES = {
   frame: () => import('./features/frame.js'),
   sun: () => import('./features/sun.js'),
   relief: () => import('./features/relief.js'),
+  // last: restore wants the studies-validated day/timeline, and the series
+  // assembly reads the studies-decorated hooks.frameSource
+  timeseries: () => import('./features/timeseries.js'),
 };
 
 async function loadFeatures() {
@@ -212,9 +216,12 @@ async function main() {
       const on = state.enabled[field] && src &&
         src.shells.includes(state.shell);
       u.uEnable.value[i] = on ? 1 : 0;
-      // the active series may store this field at a different range than
-      // the field default (v2.9) — descale must follow the tiles
+      // the active series may store this field at a different range (v2.9)
+      // or grid (v2.13 — quarterly seculars at 2°) than the field default —
+      // descale and texel math must follow the tiles
       u.uScale.value[i] = storageQrange(field, state.day);
+      const g = storageGrid(field, state.day);
+      u.uGrid.value[i].set(g[0], g[1], 1 / g[0], 1 / g[1]);
       if (!on) continue;
       const a = src.stepped ? Math.min(Math.floor(step), src.n - 2) : 0;
       const b = src.stepped ? a + 1 : 0;

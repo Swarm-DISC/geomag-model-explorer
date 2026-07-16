@@ -1,1 +1,2 @@
 three 0.184.0 (npm pack three, build/three.module.js + build/three.core.js + examples/jsm/controls/OrbitControls.js)
+uPlot 1.6.32 (npm pack uplot, dist/uPlot.esm.js + dist/uPlot.min.css; LICENSE.uplot)

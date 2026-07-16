@@ -95,7 +95,8 @@ export function attach({ state, manifest }) {
   btn.title = 'About the model on display';
   btn.setAttribute('aria-label', 'About the model on display');
   btn.textContent = 'ⓘ';
-  document.getElementById('globe').appendChild(btn);
+  // #viewport, not #globe: series view hides the globe, the ⓘ must stay.
+  document.getElementById('viewport').appendChild(btn);
 
   const dialog = document.createElement('dialog');
   dialog.id = 'model-info';
@@ -121,6 +122,7 @@ export function attach({ state, manifest }) {
       const model = rec?.models?.[field] ?? spec.model;
       const meta = manifest.models?.[model];
       const qrange = rec?.qrange_nT?.[field] ?? spec.qrange_nT;
+      const grid = rec?.grid?.[field] ?? spec.grid;
       const units = spec.units ?? 'nT';
       const single = rec?.single_step?.includes(field);
       const cadence = rec
@@ -145,7 +147,7 @@ export function attach({ state, manifest }) {
           + '</div>',
         `<p class="mi-meta">${[
           validity && `valid ${esc(validity)}`,
-          spec.grid && `grid ${spec.grid[0]}×${spec.grid[1]}`,
+          grid && `grid ${grid[0]}×${grid[1]}`,
           cadence,
           qrange && `stored ±${qrange} ${esc(units)}`,
         ].filter(Boolean).join(' · ')}</p>`,

@@ -1,10 +1,10 @@
 """Sunlight feature (PLAN v2.12, superseding the v2.6 overlay) against a
-sandboxed server (:8218) with the flag on: the Sunlight checkbox appears (on
+sandboxed server (:8234) with the flag on: the Sunlight checkbox appears (on
 by default), toggling shades the globe by day/night (uSunlight/uSunDir
 uniforms — the retired terminator/glyph overlay must never exist), the sun
 direction matches the analytic subsolar point and tracks the time slider,
 and the off state round-trips as sun=0 (absent = on; the pre-v2.12 sun=1
-still parses; garbage ignored). Flag-off (:8219, same data) shows no
+still parses; garbage ignored). Flag-off (:8235, same data) shows no
 checkbox and never shades."""
 from __future__ import annotations
 
@@ -21,8 +21,8 @@ import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 ARTIFACTS = Path(__file__).parent / "artifacts"
-PORT_ON = 8218
-PORT_OFF = 8219
+PORT_ON = 8234
+PORT_OFF = 8235
 SEED_DAY = "2020-01-01"
 SEED_SERIES = "mio-seasonal-2020"
 TIMEOUT_MS = 120_000
