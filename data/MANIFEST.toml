@@ -76,53 +76,53 @@ sha256 = "851f581ff5ffb844deed8ae1a9ce22e3c4bb3d74fa342cadb5d8e39b41ae7c3c"
 
 [files."series/core-secular/core"]
 model = "Core = 'MCO_SHA_2C'"
-grid = "361x181"
+grid = "181x91"
 shells = ["cmb", "d2500", "d2000", "d1500", "d1000", "d500", "surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
 radii_m = [3480000.0, 3871000.0, 4371000.0, 4871000.0, 5371000.0, 5871000.0, 6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
-n_snapshots = 10
-time = "2014-06-01T12:00:00/1y/10"
+n_snapshots = 37
+time = "2014-06-01T12:00:00/3mo/37"
 viresclient = "0.16.0"
-fetched_at = "2026-06-12T20:09:36.770142+00:00"
-sha256 = "287729269f9e4b01f27694f839436a4e7ca311475009a2c5b7a7c0fd9334469e"
+fetched_at = "2026-07-16T15:57:04.271491+00:00"
+sha256 = "e136000e15702098781bc4eea9b6e64163159e77ba485585dc1edeeb2d784dfd"
 series_kind = "secular"
 series_family = "ci"
 
 [files."series/core-secular/core-sv"]
 model = "Core = 'MCO_SHA_2C'"
-grid = "361x181"
+grid = "181x91"
 shells = ["cmb", "d2500", "d2000", "d1500", "d1000", "d500", "surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
 radii_m = [3480000.0, 3871000.0, 4371000.0, 4871000.0, 5371000.0, 5871000.0, 6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
-n_snapshots = 10
-time = "2014-06-01T12:00:00/1y/10 (sv: centered ±6mo finite difference, nT/yr)"
+n_snapshots = 37
+time = "2014-06-01T12:00:00/3mo/37 (sv: centered ±6mo finite difference, nT/yr)"
 viresclient = "0.16.0"
-fetched_at = "2026-06-12T20:09:36.971499+00:00"
-sha256 = "862c3e22a1a3e4b1345ad0c544e12926ea339b45b78d8c60ff87798835e8572d"
+fetched_at = "2026-07-16T15:57:04.629738+00:00"
+sha256 = "ebd28896b68b0332070b70a06b0bb7a574915adbffc3c0f50857d46f5f2173d5"
 series_kind = "secular"
 series_family = "ci"
 
 [files."series/core-secular@chaos/core"]
 model = "Core = 'CHAOS-Core'"
-grid = "361x181"
+grid = "181x91"
 shells = ["cmb", "d2500", "d2000", "d1500", "d1000", "d500", "surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
 radii_m = [3480000.0, 3871000.0, 4371000.0, 4871000.0, 5371000.0, 5871000.0, 6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
-n_snapshots = 10
-time = "2014-06-01T12:00:00/1y/10"
+n_snapshots = 104
+time = "1997-09-01T12:00:00/3mo/104"
 viresclient = "0.16.0"
-fetched_at = "2026-06-12T20:13:32.868089+00:00"
-sha256 = "93288a4095d0a943ee9d01d287e0e020cbe9bc633f08c2e619cd5193a0b6fe84"
+fetched_at = "2026-07-16T15:57:09.026325+00:00"
+sha256 = "a2a74dadbf4e1ad963a0a5c4ec741e6ac14be77d98db87aa3eac20d26bba4730"
 series_kind = "secular"
 series_family = "chaos"
 
 [files."series/core-secular@chaos/core-sv"]
 model = "Core = 'CHAOS-Core'"
-grid = "361x181"
+grid = "181x91"
 shells = ["cmb", "d2500", "d2000", "d1500", "d1000", "d500", "surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
 radii_m = [3480000.0, 3871000.0, 4371000.0, 4871000.0, 5371000.0, 5871000.0, 6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
-n_snapshots = 10
-time = "2014-06-01T12:00:00/1y/10 (sv: centered ±6mo finite difference, nT/yr)"
+n_snapshots = 104
+time = "1997-09-01T12:00:00/3mo/104 (sv: centered ±6mo finite difference, nT/yr)"
 viresclient = "0.16.0"
-fetched_at = "2026-06-12T20:13:33.062421+00:00"
-sha256 = "8268ab4632533a662c686c4d84d12e4b868650dbdde2f55135cb7d9434516c4e"
+fetched_at = "2026-07-16T15:57:10.120885+00:00"
+sha256 = "6ff64ec3c48215b4631ba6a2ec7ccb4ff0ab79578988816daf772ccd0b49b63b"
 series_kind = "secular"
 series_family = "chaos"
 
@@ -154,27 +154,27 @@ series_family = "igrf"
 
 [files."series/core-secular@mco2d/core"]
 model = "Core = 'MCO_SHA_2D'"
-grid = "361x181"
+grid = "181x91"
 shells = ["cmb", "d2500", "d2000", "d1500", "d1000", "d500", "surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
 radii_m = [3480000.0, 3871000.0, 4371000.0, 4871000.0, 5371000.0, 5871000.0, 6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
-n_snapshots = 4
-time = "2014-06-01T12:00:00/1y/4"
+n_snapshots = 13
+time = "2014-06-01T12:00:00/3mo/13"
 viresclient = "0.16.0"
-fetched_at = "2026-07-01T21:14:07.573060+00:00"
-sha256 = "c74d0863c8868e3b9a529c1e6ad28e23a5f0e72c4573e9e71178879d5d800223"
+fetched_at = "2026-07-16T15:57:19.634296+00:00"
+sha256 = "ed6be59d968b3e591a49461cad232f015dc56ba2dd6a0df17c0f7e72e3a35afa"
 series_kind = "secular"
 series_family = "mco2d"
 
 [files."series/core-secular@mco2d/core-sv"]
 model = "Core = 'MCO_SHA_2D'"
-grid = "361x181"
+grid = "181x91"
 shells = ["cmb", "d2500", "d2000", "d1500", "d1000", "d500", "surface", "h100", "h200", "h300", "h400", "h500", "h600", "h700", "h800", "h900", "h1000", "h1100", "h1200", "h1300", "h1400", "h1500"]
 radii_m = [3480000.0, 3871000.0, 4371000.0, 4871000.0, 5371000.0, 5871000.0, 6371000.0, 6471000.0, 6571000.0, 6671000.0, 6771000.0, 6871000.0, 6971000.0, 7071000.0, 7171000.0, 7271000.0, 7371000.0, 7471000.0, 7571000.0, 7671000.0, 7771000.0, 7871000.0]
-n_snapshots = 4
-time = "2014-06-01T12:00:00/1y/4 (sv: centered ±6mo finite difference, nT/yr)"
+n_snapshots = 13
+time = "2014-06-01T12:00:00/3mo/13 (sv: centered ±6mo finite difference, nT/yr)"
 viresclient = "0.16.0"
-fetched_at = "2026-07-01T21:14:07.648614+00:00"
-sha256 = "aae9359086df1b841b926edde91c950633ca024b68dc058d315eeddef88eafa4"
+fetched_at = "2026-07-16T15:57:19.767979+00:00"
+sha256 = "359befb0ed2cda36227140de38d525e171cd928e1b9ef37d454aee7c5fe719ba"
 series_kind = "secular"
 series_family = "mco2d"
 
