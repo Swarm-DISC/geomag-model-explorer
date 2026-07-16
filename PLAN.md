@@ -67,23 +67,72 @@ the Heimdall :8300 portal serve the checkout's exported data via
 
 ## 2. Live operational concerns
 
+**Efficiency pass (branch `efficiency`, 2026-07-16)** — measured review in
+[`docs/efficiency-review.md`](./docs/efficiency-review.md) (footprint, 4c/8GB
+capacity model, per-source sampling analysis vs each model's SH degree and
+temporal parameterisation). Landed in this pass:
+
+- **Serving** — tiles now get `.i16.gz` siblings at export (level 9, mtime=0)
+  and serve.py's `TileFiles` sends them with `Content-Encoding: gzip` +
+  `Cache-Control: immutable` (tile paths are content-immutable; manifest.json
+  is `no-cache`). This is ladder rung 3 minus bundling: measured, it lifts the
+  playback ceiling from ~30 to ~90–100 concurrent viewers on a 4-core host —
+  per-request gzip on the single event loop was the binding constraint, not
+  bandwidth or RAM. Fallback gzip runs at level 6 (+47% throughput, +0.04%
+  bytes vs the old level-9 default). The manifest parse is cached on stat.
+  **One-time activation on the primary checkout after merge** (one block,
+  before any new day-fetch POST): re-export every cached day and series from
+  raw (`export.py --day <d>` / `--series <id>` — no VirES contact; this
+  applies the v5 per-shell qranges below), then
+  `uv run python export.py --compress-existing` for anything untouched.
+- **Client** — tile cache is byte-budgeted (128 MB GPU) instead of 64 entries,
+  so a full-day playback loop (194 tiles) no longer evicts itself each pass;
+  slider drags coalesce to one texture pass per frame and abort superseded
+  in-flight tile fetches (one hard scrubber could previously saturate the
+  server's event loop for every viewer).
+- **Raw store** — new raw npz are float32 + deflate (~12× smaller: a core
+  bundle 34.5 MB → ~2.9 MB; a new day ~1.3 GB → ~0.11 GB). float32's ~6e-8
+  relative error sits 3 orders under the int16 tile quantization. Existing
+  float64 raw stays valid (np.load reads both); no retro-pass — MANIFEST.toml
+  sha256 provenance of already-fetched snapshots is untouched.
+- **Per-shell quantization ranges (manifest v5)** — one CMB-sized qrange
+  (3e6 nT) quantized the surface core field to 91.6 nT steps: stored values
+  sat flat for years, then jumped one int16 step (plainly visible in the
+  timeline charts; ±46 nT in the hover readout). Core/core-sv now carry
+  per-shell qranges sized from measured per-shell maxima (~2x headroom):
+  surface step 3.66 nT (core) / 0.015 nT/yr (core-sv). Additive manifest
+  key (`qrange_nT_shells`); pre-v5 records decode by their scalar exactly
+  as quantized. Tile URLs carry a `?v=<qrange-grid>` cache-bust so the
+  immutable cache can never descale stale bytes.
+- **Timeline exactness** (globe may approximate, charts must not): chart
+  assembly snaps the pin to the nearest node of the coarsest charted grid —
+  every plotted value is an exact stored evaluation (grids nest: 2° nodes ⊂
+  1° ⊂ 0.5°), with the snapped coordinates shown in the panel status line.
+
 Carried forward — still open, not yet decisions:
 
-- **Disk policy** (v1 §9.3): cached days accumulate forever — on the v2.7
-  ladder ~320 MB/day tiles + ~1.3 GB/day raw npz (current cache: 2.0 GB
-  tiles, 8.2 GB raw after the v2.11 families; ~57 GB free — the v2.13
-  quarterly-core addendum adds only ~2.6 GB raw + ~0.7 GB tiles per data
-  root). Rung 1 (drop `data/raw/` after export)
-  was considered with v2.7 and **deferred 2026-06-12**: raw retains
-  re-export flexibility (qrange/format changes without refetching) and the
-  disk has headroom. The scaling ladder, in order, architecture unchanged
-  until the last rung: (1) drop `data/raw/` after export; (2)
-  `GEOMAG_MODEL_EXPLORER_DATA` env var → big disk; (3) bundle frames per
-  field·shell·day, precompressed; (4) int8 for MIO/MMA; (5) only then a
-  blob store. A future Storms study (IDEAS §9.1 `window` kind / §9.4 —
-  demoted from the phase ladder 2026-06-12) would add deliberate
-  *multi-day* caching on top. Materialized series sit at ~10–100 MB each
-  (mio-seasonal-2020 is now ~84 MB on the full ladder).
+- **Disk policy** (v1 §9.3): cached days accumulate forever — tiles
+  ~320 MB/day; raw npz now ~0.11 GB/day compressed (was ~1.3 GB). Current
+  cache: 2.0 GB tiles, 8.2 GB raw (pre-compression corpus; ~52 GB free —
+  the v2.13 quarterly-core addendum adds only ~2.6 GB raw + ~0.7 GB tiles
+  per data root, ~0.22 GB raw once refetched compressed). Rung 1 (drop
+  `data/raw/` after export) was considered with v2.7 and **deferred
+  2026-06-12**: raw retains re-export flexibility (qrange/format changes
+  without refetching) and the disk has headroom; the float32+deflate change
+  extends that headroom ~12×. Policy (efficiency review): tiles stay
+  accumulate-forever (they are the product); if disk pressure returns, prune
+  *raw only* (it is regenerable per §4 provenance) before reaching for rung 2.
+  The scaling ladder, in order, architecture unchanged until the last rung:
+  (1) drop `data/raw/` after export; (2) `GEOMAG_MODEL_EXPLORER_DATA` env
+  var → big disk; (3) bundle frames per field·shell·day, precompressed —
+  **the precompression half landed 2026-07-16**; (4) int8 for MIO/MMA —
+  **deprioritized 2026-07-16**: the review's sampling analysis dominates it
+  losslessly (see docs/efficiency-review.md Table A) and int8 at fixed qrange
+  is ~16 colormap steps of banding; (5) only then a blob store. A future
+  Storms study (IDEAS §9.1 `window` kind / §9.4 — demoted from the phase
+  ladder 2026-06-12) would add deliberate *multi-day* caching on top.
+  Materialized series sit at ~10–100 MB each (mio-seasonal-2020 is now
+  ~84 MB on the full ladder).
 - **Radial interpolation between shells** (v1 §9.6): deferred — physically
   honest continuation needs per-degree (a/r)^(n+2), i.e. client-side SH
   evaluation. Offer later as explicitly approximate, or never.

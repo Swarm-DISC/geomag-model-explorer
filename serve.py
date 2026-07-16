@@ -25,6 +25,8 @@ import threading
 from pathlib import Path
 
 from starlette.applications import Starlette
+from starlette.datastructures import Headers
+from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import JSONResponse
@@ -47,10 +49,23 @@ DEFAULT_FETCH_CMD = "uv run --extra fetch python fetch.py"
 DEFAULT_EXPORT_CMD = "uv run --extra fetch python export.py"
 
 
+_manifest_cache: tuple[tuple[int, int], dict] | None = None  # ((mtime_ns, size), parsed)
+
+
 def read_manifest() -> dict:
-    if MANIFEST_JSON.exists():
-        return json.loads(MANIFEST_JSON.read_text())
-    return {"default_day": None, "validity": None, "days": {}}
+    """Parsed manifest, cached on (mtime_ns, size). The manifest is rewritten
+    atomically by export.py (tmp + os.replace), so a stat change is the exact
+    publish signal; the frontend polls /api/days every 2 s during a fetch and
+    each poll otherwise re-reads + re-parses 85 KB on the event loop."""
+    global _manifest_cache
+    try:
+        st = MANIFEST_JSON.stat()
+    except OSError:
+        return {"default_day": None, "validity": None, "days": {}}
+    key = (st.st_mtime_ns, st.st_size)
+    if _manifest_cache is None or _manifest_cache[0] != key:
+        _manifest_cache = (key, json.loads(MANIFEST_JSON.read_text()))
+    return _manifest_cache[1]
 
 
 def read_validity() -> dict | None:
@@ -67,6 +82,41 @@ def read_features() -> dict:
         return flags if isinstance(flags, dict) else {}
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+class TileFiles(StaticFiles):
+    """StaticFiles + the tile-serving policy (PLAN §2 scaling ladder, rung 3):
+
+    - `<tile>.i16.gz` siblings (export.py emits them) are served with
+      `Content-Encoding: gzip` when the client accepts it, so tiles skip the
+      per-request gzip pass that otherwise runs on the single event loop —
+      that pass, not bandwidth or RAM, is the serving bottleneck.
+    - Tile paths are content-immutable (same raw + qrange re-exports
+      byte-identical; a format change bumps the path) → immutable max-age.
+    - manifest.json is the mutable atomic-publish point → no-cache, so
+      clients always revalidate (ETag keeps that a 304).
+    """
+
+    async def get_response(self, path: str, scope):
+        response = None
+        if (path.endswith(".i16")
+                and "gzip" in Headers(scope=scope).get("accept-encoding", "")):
+            try:
+                response = await super().get_response(path + ".gz", scope)
+                response.headers["content-encoding"] = "gzip"
+                response.headers["content-type"] = "application/octet-stream"
+                response.headers["vary"] = "Accept-Encoding"
+            except HTTPException as exc:
+                if exc.status_code != 404:   # no sibling: fall through
+                    raise
+        if response is None:
+            response = await super().get_response(path, scope)
+        if path.endswith(".i16"):
+            response.headers["cache-control"] = ("public, max-age=31536000, "
+                                                 "immutable")
+        elif path.endswith("manifest.json"):
+            response.headers["cache-control"] = "no-cache"
+        return response
 
 
 class JobRunner:
@@ -211,8 +261,11 @@ app = Starlette(
         Route("/api/days", api_days),
         Route("/api/days/{date}", api_post_day, methods=["POST"]),
         # tiles + manifest.json — may live outside the checkout (GEOMAG_MODEL_EXPLORER_DATA)
-        Mount("/data", StaticFiles(directory=WEB_DATA, check_dir=False)),
+        Mount("/data", TileFiles(directory=WEB_DATA, check_dir=False)),
         Mount("/", StaticFiles(directory=WEB, html=True)),
     ],
-    middleware=[Middleware(GZipMiddleware, minimum_size=1024)],
+    # level 6: measured +47% event-loop throughput over the level-9 default
+    # for +0.04% bytes; precompressed tiles bypass this middleware entirely
+    # (it skips responses that already carry Content-Encoding).
+    middleware=[Middleware(GZipMiddleware, minimum_size=1024, compresslevel=6)],
 )

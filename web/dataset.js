@@ -3,11 +3,17 @@
 import * as THREE from 'three';
 
 const BASE = './data/';
-const MAX_ENTRIES = 64;   // ≈ 33 MB GPU at the largest grid
+// Byte budget, not an entry count: 64 entries kept a one-day playback
+// working set (2 fields x 97 steps = 194 small tiles ≈ 26 MB) permanently
+// evicting itself — every loop pass refetched the whole day. 128 MB holds
+// several days of small tiles or ~245 core-grid tiles.
+const MAX_GPU_BYTES = 128 * 1024 * 1024;
 
 let manifest = null;
-const cache = new Map();    // key -> Promise<{tex, i16}>; Map order = LRU
+const cache = new Map();    // key -> {p: Promise<{tex, i16}>, bytes}; Map order = LRU
 const resolved = new Map(); // key -> {tex, i16} once decoded (sync access)
+const inflight = new Map(); // key -> AbortController while the fetch runs
+let totalBytes = 0;         // GPU bytes of everything in `cache`
 let decodeHook = null;      // called with each new texture (GPU pre-upload)
 
 export function setDecodeHook(fn) { decodeHook = fn; }
@@ -38,14 +44,25 @@ export function tileURL(field, shell, day, step) {
   // reads its 2-digit static tile
   const dir = fieldDay(field, day);
   const nn = String(step).padStart(manifest.series?.[dir] ? 3 : 2, '0');
-  return `${BASE}${field}/${shell}/${dir}/t${nn}.i16`;
+  // cache-bust keyed to the decode parameters: tiles are served immutable,
+  // and a qrange/grid change alters the bytes at the same path — the URL
+  // must change with them or long-cached tiles would descale wrongly
+  const [nlon, nlat] = storageGrid(field, day);
+  const v = `${storageQrange(field, day, shell)}-${nlon}x${nlat}`;
+  return `${BASE}${field}/${shell}/${dir}/t${nn}.i16?v=${v}`;
 }
 
 // The storage range a field's tiles at this day/series were quantized with:
 // a series may override the field default (v2.9 — CHAOS-Core at the CMB).
 // Every descale site (GPU uScale, CPU hover) must go through this.
-export function storageQrange(field, day) {
-  return manifest.series?.[day]?.qrange_nT?.[field]
+export function storageQrange(field, day, shell) {
+  // shell-first (v5): one CMB-sized range quantized the surface to ~92 nT
+  // steps. Records predating the per-shell maps resolve by their scalar —
+  // exactly how their tiles were quantized.
+  const series = manifest.series?.[day];
+  return series?.qrange_nT_shells?.[field]?.[shell]
+    ?? series?.qrange_nT?.[field]
+    ?? manifest.fields[field].qrange_nT_shells?.[shell]
     ?? manifest.fields[field].qrange_nT;
 }
 
@@ -110,12 +127,29 @@ function decode(i16, nlon, nlat) {
   return tex;
 }
 
+function drop(url) {
+  const slot = cache.get(url);
+  if (!slot) return;
+  cache.delete(url);
+  resolved.delete(url);
+  totalBytes -= slot.bytes;
+  slot.p.then((entry) => entry.tex.dispose()).catch(() => {});
+}
+
 function evict() {
-  while (cache.size > MAX_ENTRIES) {
-    const [oldKey, oldVal] = cache.entries().next().value;
-    cache.delete(oldKey);
-    resolved.delete(oldKey);
-    oldVal.then((entry) => entry.tex.dispose()).catch(() => {});
+  // size > 1: never evict the entry that just went over the budget alone —
+  // its texture is about to be bound.
+  while (totalBytes > MAX_GPU_BYTES && cache.size > 1) {
+    drop(cache.keys().next().value);
+  }
+}
+
+// Abort in-flight tile fetches whose URL is not in `keep` — called on scrub,
+// where each input event supersedes the last one's requests. Aborted entries
+// clean themselves out of the cache via their rejection handler.
+export function abortStaleFetches(keep) {
+  for (const [url, ctrl] of inflight) {
+    if (!keep.has(url)) ctrl.abort();
   }
 }
 
@@ -123,13 +157,15 @@ function evict() {
 export function getTexture(field, shell, day, step) {
   const url = tileURL(field, shell, day, step);
   if (cache.has(url)) {            // refresh LRU position
-    const entry = cache.get(url);
+    const slot = cache.get(url);
     cache.delete(url);
-    cache.set(url, entry);
-    return entry;
+    cache.set(url, slot);
+    return slot.p;
   }
   const [nlon, nlat] = storageGrid(field, day);
-  const promise = fetch(url).then(async (resp) => {
+  const ctrl = new AbortController();
+  inflight.set(url, ctrl);
+  const promise = fetch(url, { signal: ctrl.signal }).then(async (resp) => {
     if (!resp.ok) throw new Error(`${url}: HTTP ${resp.status}`);
     const i16 = new Int16Array(await resp.arrayBuffer());
     if (i16.length !== nlon * nlat * 3) {
@@ -140,8 +176,10 @@ export function getTexture(field, shell, day, step) {
     if (cache.has(url)) resolved.set(url, entry);  // not evicted meanwhile
     return entry;
   });
-  promise.catch(() => cache.delete(url));   // don't cache failures
-  cache.set(url, promise);
+  promise.then(() => inflight.delete(url),
+               () => { inflight.delete(url); drop(url); });  // no failed entries
+  cache.set(url, { p: promise, bytes: nlon * nlat * 8 });    // RGBA16F
+  totalBytes += nlon * nlat * 8;
   evict();
   return promise;
 }
@@ -151,9 +189,9 @@ export function getTextureSync(field, shell, day, step) {
   const url = tileURL(field, shell, day, step);
   const entry = resolved.get(url);
   if (entry && cache.has(url)) {   // refresh LRU position
-    const p = cache.get(url);
+    const slot = cache.get(url);
     cache.delete(url);
-    cache.set(url, p);
+    cache.set(url, slot);
   }
   return entry ?? null;
 }
@@ -174,14 +212,14 @@ export function prefetch(state, ahead = 6) {
 
 // Bilinear kernel over a decoded tile (full int16 precision), shared by the
 // hover readout and the timeline viewer's point sampling.
-function sampleNEC(i16, field, day, lat, lon) {
+function sampleNEC(i16, field, day, shell, lat, lon) {
   const [nlon, nlat] = storageGrid(field, day);
   const x = (lon + 180) / 360 * (nlon - 1);
   const y = (lat + 90) / 180 * (nlat - 1);
   const x0 = Math.min(Math.floor(x), nlon - 2);
   const y0 = Math.min(Math.floor(y), nlat - 2);
   const fx = x - x0, fy = y - y0;
-  const qrange = storageQrange(field, day);
+  const qrange = storageQrange(field, day, shell);
   const out = [0, 0, 0];
   for (let c = 0; c < 3; c++) {
     const at = (yy, xx) => i16[(yy * nlon + xx) * 3 + c] / 32767 * qrange;
@@ -194,7 +232,7 @@ function sampleNEC(i16, field, day, lat, lon) {
 // CPU bilinear readout in nT (full int16 precision), for the hover readout.
 export async function lookup(field, shell, day, step, lat, lon) {
   const { i16 } = await getTexture(field, shell, day, step);
-  return sampleNEC(i16, field, day, lat, lon);
+  return sampleNEC(i16, field, day, shell, lat, lon);
 }
 
 // Point sample in nT that never disturbs the texture cache — for the
@@ -207,7 +245,7 @@ export async function samplePoint(field, shell, day, step, lat, lon,
                                   { signal } = {}) {
   const url = tileURL(field, shell, day, step);
   const entry = resolved.get(url);
-  if (entry) return sampleNEC(entry.i16, field, day, lat, lon);
+  if (entry) return sampleNEC(entry.i16, field, day, shell, lat, lon);
   const resp = await fetch(url, { signal });
   if (!resp.ok) throw new Error(`${url}: HTTP ${resp.status}`);
   const i16 = new Int16Array(await resp.arrayBuffer());
@@ -215,5 +253,5 @@ export async function samplePoint(field, shell, day, step, lat, lon,
   if (i16.length !== nlon * nlat * 3) {
     throw new Error(`${url}: ${i16.length} values, expected ${nlon * nlat * 3}`);
   }
-  return sampleNEC(i16, field, day, lat, lon);
+  return sampleNEC(i16, field, day, shell, lat, lon);
 }

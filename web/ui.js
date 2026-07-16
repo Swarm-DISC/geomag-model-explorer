@@ -128,6 +128,20 @@ export function initUI(state, manifest, hooks, timeline) {
     shellLabelEl.textContent = shellLabel(...shellRadii[idx]);
     refreshToggles();
   }
+  // Slider drags fire per input event (up to display rate); the label/state
+  // updates are cheap but the texture pass is not — coalesce to one
+  // applyTextures per frame, flagged as a scrub so superseded tile fetches
+  // are aborted instead of piling onto the server.
+  let applyQueued = false;
+  function scheduleScrubApply() {
+    if (applyQueued) return;
+    applyQueued = true;
+    requestAnimationFrame(() => {
+      applyQueued = false;
+      hooks.applyTextures({ scrub: true });
+    });
+  }
+
   shellSlider.addEventListener('input', () => {
     const [slug, radiusM] = shellRadii[Number(shellSlider.value)];
     state.shell = slug;
@@ -135,7 +149,7 @@ export function initUI(state, manifest, hooks, timeline) {
     refreshToggles();
     refreshColorbar();
     hooks.setShell(radiusM / R_SURFACE_M);
-    hooks.applyTextures();
+    scheduleScrubApply();
   });
 
   // --- date picker -----------------------------------------------------------
@@ -177,7 +191,7 @@ export function initUI(state, manifest, hooks, timeline) {
   timeSlider.addEventListener('input', () => {
     state.pos = Number(timeSlider.value) / timeline.subdiv;
     timeLabel.textContent = timeline.label(state.pos);
-    hooks.applyTextures();
+    scheduleScrubApply();
   });
   playBtn.addEventListener('click', () => {
     state.playing = !state.playing;

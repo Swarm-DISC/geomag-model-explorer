@@ -393,3 +393,25 @@ def test_single_epoch_series_fields_are_single_step():
     for sid, s in SERIES.items():
         if len(s.epochs()) == 1:
             assert set(s.fields) <= set(s.single_step), sid
+
+
+def test_save_snapshot_stores_compressed_float32(tmp_path, monkeypatch):
+    """Raw npz is float32 + deflate (efficiency review 2026-07): ~12x smaller,
+    and float32's ~6e-8 relative error sits 3 orders under the int16 tile
+    quantization, so re-export fidelity is unaffected."""
+    import zipfile
+
+    f = FIELDS["iono"]
+    val = np.array([12.5, -3.25, 900.0])
+    monkeypatch.setattr(fetch, "eval_stacked", lambda field, when: np.broadcast_to(
+        val, (len(field.shells), field.nlat, field.nlon, 3)).astype(np.float64))
+    out = tmp_path / "t00.npz"
+    fetch._save_snapshot(f, out, dt.datetime(2020, 1, 1, 12), force=False)
+    with zipfile.ZipFile(out) as zf:
+        assert all(i.compress_type == zipfile.ZIP_DEFLATED
+                   for i in zf.infolist())
+    with np.load(out) as npz:
+        for slug in f.shells:
+            arr = npz[f"B_{slug}"]
+            assert arr.dtype == np.float32
+            assert np.allclose(arr, val)

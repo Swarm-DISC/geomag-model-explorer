@@ -10,9 +10,16 @@ Reads only local files (RULES §3). Tile format (PLAN §2 refinement):
 A day or series is cached iff listed in web/data/manifest.json — the manifest
 is written last via tmp + os.replace, making it the atomic-publish mechanism.
 
+Every tile also gets a `<name>.i16.gz` sibling (level-9, mtime=0 so re-exports
+stay byte-identical): serve.py sends it with Content-Encoding instead of
+gzipping per request on its one event loop (PLAN §2 rung 3). Completeness
+checks look only at the .i16 — the .gz is a derived artifact and the server
+falls back to on-the-fly compression when one is missing.
+
     uv run python export.py --static             # crust tiles
     uv run python export.py --day 2020-01-01     # one day's tiles
     uv run python export.py --series <id>        # one curated series' tiles
+    uv run python export.py --compress-existing  # backfill .gz siblings
     uv run python export.py --assets             # nio LUT + coastlines.png
                                                  # (needs `uv sync --extra assets`;
                                                  #  geojson via `fetch.py --assets`)
@@ -21,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import gzip
 import json
 import sys
 from pathlib import Path
@@ -78,10 +86,34 @@ def _export_snapshot(field: FieldSpec, npz_file: Path, tile_for) -> dict:
                             "p99": float(np.percentile(np.abs(b), 99))}
             out = tile_for(shell)
             out.parent.mkdir(parents=True, exist_ok=True)
+            payload = quantize(b, field.qrange_for(shell)).tobytes()
             tmp = out.with_suffix(".i16.tmp")
-            tmp.write_bytes(quantize(b, field.qrange).tobytes())
+            tmp.write_bytes(payload)
             tmp.replace(out)
+            _write_gz(out, payload)
     return stats
+
+
+def _write_gz(tile: Path, payload: bytes) -> None:
+    """Atomic `<tile>.gz` sibling. mtime=0 keeps the bytes deterministic."""
+    gz = tile.with_name(tile.name + ".gz")
+    tmp = gz.with_suffix(".gz.tmp")
+    tmp.write_bytes(gzip.compress(payload, compresslevel=9, mtime=0))
+    tmp.replace(gz)
+
+
+def compress_existing() -> None:
+    """Backfill .gz siblings for tiles from before they were emitted at
+    export time (or whose tile was rewritten since). Idempotent; additive."""
+    done = skipped = 0
+    for tile in sorted(WEB_DATA.rglob("*.i16")):
+        gz = tile.with_name(tile.name + ".gz")
+        if gz.exists() and gz.stat().st_mtime >= tile.stat().st_mtime:
+            skipped += 1
+            continue
+        _write_gz(tile, tile.read_bytes())
+        done += 1
+    print(f"export: compressed {done} tile(s), {skipped} already current")
 
 
 def _merge_stats(acc: dict, new: dict) -> dict:
@@ -177,6 +209,11 @@ def export_series(series_id: str) -> None:
         # the storage range each field's tiles were quantized with — may
         # override the field default (CHAOS-Core at the CMB needs ~3x)
         "qrange_nT": {name: f.qrange for name, f in sfields.items()},
+        # per-shell quantization ranges (v5): shells absent from the map used
+        # the scalar above — decode must resolve shell-first
+        "qrange_nT_shells": {
+            name: {slug: f.qrange_for(slug) for slug in f.shells}
+            for name, f in sfields.items() if f.qrange_shells},
         # the grid each field's tiles were evaluated on — may override the
         # field default (the quarterly secular series run at 2°, v2.13)
         "grid": {name: [f.nlon, f.nlat] for name, f in sfields.items()},
@@ -237,6 +274,9 @@ def write_manifest(day_record: tuple[str, dict] | None = None,
         # qrange_nT/vmax_nT key names are kept even for non-nT fields
         # (renaming would break additivity) — "units" is the truth (v2.9)
         rec = {"grid": [f.nlon, f.nlat], "qrange_nT": f.qrange,
+               **({"qrange_nT_shells":
+                   {slug: f.qrange_for(slug) for slug in f.shells}}
+                  if f.qrange_shells else {}),
                "vmax_nT": f.vmax, "cadence": f.cadence,
                "n_steps": f.n_steps, "shells": dict(f.shells),
                "units": f.units,
@@ -271,7 +311,10 @@ def write_manifest(day_record: tuple[str, dict] | None = None,
         # and the series-only core-sv field record — all additive again.
         # v4 (v2.11): per-field "model"/"sv", per-series "models", top-level
         # "models" (validity + expression per served model) — additive again.
-        "version": 4,
+        # v5 (efficiency branch): per-field/per-series "qrange_nT_shells" —
+        # additive; tiles quantized before v5 have no map and decode by the
+        # scalar exactly as before.
+        "version": 5,
         "default_day": DEFAULT_DAY,
         "validity": validity,
         "models": models,
@@ -329,12 +372,17 @@ def main() -> None:
     parser.add_argument("--static", action="store_true")
     parser.add_argument("--day", metavar="YYYY-MM-DD")
     parser.add_argument("--series", metavar="ID", choices=sorted(SERIES))
+    parser.add_argument("--compress-existing", action="store_true")
     parser.add_argument("--assets", action="store_true")
     args = parser.parse_args()
-    if not (args.static or args.day or args.series or args.assets):
-        parser.error("nothing to do: pass --static, --day, --series or --assets")
+    if not (args.static or args.day or args.series or args.assets
+            or args.compress_existing):
+        parser.error("nothing to do: pass --static, --day, --series, "
+                     "--compress-existing or --assets")
     if args.assets:
         gen_assets()
+    if args.compress_existing:
+        compress_existing()
     if args.static:
         export_static()
     if args.day:

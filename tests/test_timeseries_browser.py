@@ -237,10 +237,24 @@ def test_charts_render_and_match_readout(servers, watched_page):
     assert all(v is not None for v in res["N"])
     assert max(res["N"]) - min(res["N"]) > 0   # iono/magneto vary intraday
 
-    expected = page.evaluate("""async () => {
+    # Charts sample the nearest node of the coarsest charted grid (exact
+    # stored values — efficiency review 2026-07), so the reference lookup
+    # runs at the snapped coordinates the assembly reports, where the
+    # bilinear kernel degenerates to the node value.
+    snap = res["snap"]
+    coarsest = page.evaluate("""() => {
+      const g = window.geomagModelExplorer;
+      let n = Infinity;
+      for (const [f, on] of Object.entries(g.state.enabled)) {
+        if (on) n = Math.min(n, g.manifest.fields[f].grid[0]);
+      }
+      return 360 / (n - 1);
+    }""")
+    assert abs(snap["lon"] / coarsest - round(snap["lon"] / coarsest)) < 1e-9
+    assert abs(snap["lat"] / coarsest - round(snap["lat"] / coarsest)) < 1e-9
+    expected = page.evaluate("""async (snap) => {
       const g = window.geomagModelExplorer;
       const ds = await import('./dataset.js');   // same module instance
-      const pt = g.state.point;
       const sum = [0, 0, 0];
       for (const [field, on] of Object.entries(g.state.enabled)) {
         if (!on) continue;
@@ -248,11 +262,11 @@ def test_charts_render_and_match_readout(servers, watched_page):
         if (!src || !src.shells.includes(g.state.shell)) continue;
         const s = src.stepped ? Math.min(10, src.n - 1) : 0;
         const nec = await ds.lookup(field, g.state.shell, g.state.day, s,
-                                    pt.lat, pt.lon);
+                                    snap.lat, snap.lon);
         for (let c = 0; c < 3; c++) sum[c] += nec[c];
       }
       return sum;
-    }""")
+    }""", snap)
     got = [res["N"][10], res["E"][10], res["C"][10]]
     for a, b in zip(expected, got):
         assert abs(a - b) < 1e-6, f"{expected} vs {got}"

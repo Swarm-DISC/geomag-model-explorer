@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { loadManifest, getTexture, getTextureSync, setDecodeHook, prefetch,
          cacheSize, lookup, frameSource, storageQrange,
-         storageGrid } from './dataset.js';
+         storageGrid, tileURL, abortStaleFetches } from './dataset.js';
 import { createGlobe } from './globe.js';
 import { FIELD_INDEX } from './shaders.js';
 import { initUI, fmtTime, COMPONENT_LABELS, R_SURFACE_M } from './ui.js';
@@ -205,10 +205,13 @@ async function main() {
   let boundStep = -1;
 
   // Set the floor/ceil timestep textures for every enabled field at the
-  // current shell; disables fields without data there.
-  async function applyTextures() {
+  // current shell; disables fields without data there. scrub: true (slider
+  // drags) additionally aborts in-flight tile fetches this call supersedes —
+  // a drag fires per input event and only the newest request set matters.
+  async function applyTextures({ scrub = false } = {}) {
     const step = state.pos;
     const loads = [];
+    const wanted = new Set();
     for (const field of Object.keys(manifest.fields)) {
       const i = FIELD_INDEX[field];
       if (i === undefined) continue;
@@ -219,20 +222,26 @@ async function main() {
       // the active series may store this field at a different range (v2.9)
       // or grid (v2.13 — quarterly seculars at 2°) than the field default —
       // descale and texel math must follow the tiles
-      u.uScale.value[i] = storageQrange(field, state.day);
+      u.uScale.value[i] = storageQrange(field, state.day, state.shell);
       const g = storageGrid(field, state.day);
       u.uGrid.value[i].set(g[0], g[1], 1 / g[0], 1 / g[1]);
       if (!on) continue;
       const a = src.stepped ? Math.min(Math.floor(step), src.n - 2) : 0;
       const b = src.stepped ? a + 1 : 0;
+      wanted.add(tileURL(field, state.shell, state.day, a));
+      wanted.add(tileURL(field, state.shell, state.day, b));
       loads.push(Promise.all([
         getTexture(field, state.shell, state.day, a),
         getTexture(field, state.shell, state.day, b),
       ]).then(([ta, tb]) => {
         u[`uTexA${i}`].value = ta.tex;
         u[`uTexB${i}`].value = tb.tex;
+      }).catch((err) => {
+        // a newer scrub event aborted this pair — it is superseded, not broken
+        if (err?.name !== 'AbortError') throw err;
       }));
     }
+    if (scrub) abortStaleFetches(wanted);
     u.uVmax.value = displayVmax();
     applyComponent();
     await Promise.all(loads);

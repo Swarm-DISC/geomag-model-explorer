@@ -152,7 +152,7 @@ def test_export_series_end_to_end(sandbox):
     export.export_series(sid)
 
     manifest = json.loads(export.MANIFEST_JSON.read_text())
-    assert manifest["version"] == 4
+    assert manifest["version"] == 5
     rec = manifest["series"][sid]
     assert rec["kind"] == "annual"
     assert rec["family"] == "ci"
@@ -316,3 +316,75 @@ def test_export_static_series_end_to_end(sandbox):
     assert tile.name == "t000.i16"
     assert tile.exists()
     assert not export.series_tile_path("crust", "surface", sid, 1).exists()
+
+
+def test_export_emits_gz_siblings(sandbox):
+    """Every tile gets a deterministic .gz sibling (PLAN §2 rung 3): the
+    server sends it with Content-Encoding instead of gzipping per request."""
+    import gzip
+
+    rng = np.random.default_rng(3)
+    f = fetch.FIELDS["crust"]
+    path = fetch.raw_npz_path("static", f.name, 0)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("wb") as fh:
+        np.savez(fh, **synth_arrays(f, rng))
+    export.export_static()
+    for shell in f.shells:
+        tile = export.tile_path(f.name, shell, "static", 0)
+        sib = tile.with_name(tile.name + ".gz")
+        assert sib.exists()
+        assert gzip.decompress(sib.read_bytes()) == tile.read_bytes()
+
+
+def test_compress_existing_backfills_and_skips_current(sandbox, capsys):
+    import gzip
+    import os
+
+    rng = np.random.default_rng(4)
+    f = fetch.FIELDS["crust"]
+    path = fetch.raw_npz_path("static", f.name, 0)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("wb") as fh:
+        np.savez(fh, **synth_arrays(f, rng))
+    export.export_static()
+
+    tiles = [export.tile_path(f.name, shell, "static", 0) for shell in f.shells]
+    # simulate a pre-.gz corpus for one tile and a stale sibling for another
+    missing = tiles[0].with_name(tiles[0].name + ".gz")
+    missing.unlink()
+    stale_tile, stale_gz = tiles[1], tiles[1].with_name(tiles[1].name + ".gz")
+    past = stale_gz.stat().st_mtime - 100
+    os.utime(stale_gz, (past, past))
+
+    export.compress_existing()
+    out = capsys.readouterr().out
+    assert "compressed 2 tile(s)" in out
+    assert f"{len(tiles) - 2} already current" in out
+    assert gzip.decompress(missing.read_bytes()) == tiles[0].read_bytes()
+    assert stale_gz.stat().st_mtime >= stale_tile.stat().st_mtime
+
+
+def test_per_shell_qrange_resolves_surface_staircase(sandbox):
+    """v5: core tiles quantize per shell — the CMB-sized scalar (3e6 nT) gave
+    91.6 nT steps at the surface, freezing secular variation into multi-year
+    plateaus. Surface step is now qrange_for('surface')/32767 ≈ 3.7 nT."""
+    f = fetch.FIELDS["core"]
+    assert f.qrange_for("cmb") == f.qrange          # CMB rides the scalar
+    assert f.qrange_for("surface") < f.qrange / 20
+    rng = np.random.default_rng(11)
+    day = "2021-03-17"
+    synth_day(day, rng)
+    export.export_static()
+    export.export_day(day)
+    manifest = json.loads(export.MANIFEST_JSON.read_text())
+    assert manifest["version"] == 5
+    shells_map = manifest["fields"]["core"]["qrange_nT_shells"]
+    assert shells_map["surface"] == f.qrange_for("surface")
+    assert shells_map["cmb"] == f.qrange
+    # round-trip: a surface value decodes to within the fine step
+    raw = np.load(fetch.raw_npz_path(day, "core", 0))["B_surface"]
+    tile = export.tile_path("core", "surface", day, 0)
+    q = np.frombuffer(tile.read_bytes(), dtype="<i2").reshape(f.nlat, f.nlon, 3)
+    back = q.astype(np.float64) / 32767.0 * f.qrange_for("surface")
+    assert np.abs(back - raw).max() <= f.qrange_for("surface") / 32767.0

@@ -69,6 +69,17 @@ class FieldSpec:
                                # non-nT fields never sum with nT ones (IDEAS §9.6)
     sv: bool = False           # derived secular variation: evaluate the model at
                                # t ± 6 months and store the centered difference
+    # Per-shell qrange overrides (efficiency review 2026-07): one CMB-sized
+    # range costs ~92 nT of quantization at the surface, where the field is
+    # ±66k and SV is 10-90 nT/yr — stored core values sat flat for years,
+    # then jumped one int16 step. Shells absent here use the scalar (the CMB
+    # rides the scalar so per-family series overrides keep working). Values
+    # from the measured per-shell |B| maxima with ~2x headroom; export clips
+    # loudly if a model ever exceeds them.
+    qrange_shells: dict[str, float] | None = None
+
+    def qrange_for(self, slug: str) -> float:
+        return (self.qrange_shells or {}).get(slug, self.qrange)
 
     @property
     def alias(self) -> str:
@@ -98,7 +109,14 @@ FIELDS: dict[str, FieldSpec] = {
                 "d1500": 4_871_000.0, "d1000": 5_371_000.0,
                 "d500": 5_871_000.0,
                 **LADDER},
-        cadence="day", qrange=3_000_000.0, vmax=65_000.0),  # CMB |B| hits 2.5e6
+        cadence="day", qrange=3_000_000.0, vmax=65_000.0,  # CMB |B| hits 2.5e6
+        qrange_shells={"d2500": 1_200_000.0, "d2000": 500_000.0,
+                       "d1500": 320_000.0, "d1000": 220_000.0,
+                       "d500": 160_000.0,
+                       # surface ladder measured max 66.6k (surface) .. 33.6k
+                       # (h1500): one 120k range = 3.66 nT steps, smooth SV
+                       **{s: 120_000.0 for s in
+                          ("surface", *(f"h{a}" for a in range(100, 1501, 100)))}}),
     "crust": FieldSpec(
         name="crust", model="Crust = 'MLI_SHA_2C'", nlon=361, nlat=181,
         shells=dict(LADDER),
@@ -124,6 +142,11 @@ FIELDS: dict[str, FieldSpec] = {
                 "d500": 5_871_000.0,
                 **LADDER},
         cadence="day", qrange=100_000.0, vmax=200.0,
+        qrange_shells={"d2500": 30_000.0, "d2000": 8_000.0,
+                       "d1500": 2_400.0, "d1000": 1_200.0, "d500": 700.0,
+                       # measured max 229 (surface) .. 89 (h1500) nT/yr
+                       **{s: 500.0 for s in
+                          ("surface", *(f"h{a}" for a in range(100, 1501, 100)))}},
         units="nT/yr", sv=True),
 }
 
@@ -547,11 +570,15 @@ def _save_snapshot(field: FieldSpec, path: Path, when: dt.datetime,
     lons, lats, _, _ = make_grid(field.nlon, field.nlat)
     arrays = {"lons": lons, "lats": lats}
     for i, slug in enumerate(field.shells):
-        arrays[f"B_{slug}"] = stacked[i]
+        # float32 + deflate: ~12x smaller raw store (measured 34.5 MB -> 2.9 MB
+        # per core bundle). float32's ~6e-8 relative error is 3 orders under
+        # the int16 tile quantization (~3e-5 of qrange), so re-export fidelity
+        # is unaffected. Evaluation upstream stays float64; cast on save only.
+        arrays[f"B_{slug}"] = stacked[i].astype(np.float32)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".npz.tmp")
     with tmp.open("wb") as fh:        # file handle: np.savez must not append .npz
-        np.savez(fh, **arrays)
+        np.savez_compressed(fh, **arrays)
     tmp.replace(path)
     return path
 

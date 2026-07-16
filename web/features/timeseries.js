@@ -24,7 +24,7 @@
 
 import * as THREE from 'three';
 import uPlot from 'uplot';
-import { samplePoint } from '../dataset.js';
+import { samplePoint, storageGrid } from '../dataset.js';
 import { geodeticToGeocentric, geocentricToGeodetic } from '../geodesy.js';
 import { parseUT, seriesUT } from '../sun.js';
 import { R_SURFACE_M, shellLabel, shellUnion } from '../ui.js';
@@ -464,8 +464,31 @@ export function attach({ state, manifest, globe, ui, hooks, timeline,
   let debounceTimer = null;
   const resultCache = new Map();   // seriesKey -> assembly (LRU, CACHE_MAX)
 
+  // Charts are exact, the globe may approximate (efficiency review, 2026-07):
+  // a bilinear sample between nodes is an interpolation, not a model value.
+  // Snap the sampling point to the nearest node of the coarsest charted grid
+  // — every grid is linspace(-180..180 / -90..90), so coarse nodes (2°: even
+  // degrees) are shared by the finer 1°/0.5° grids and one snapped point is
+  // an exact stored evaluation for every summed field. At exact nodes the
+  // bilinear kernel degenerates to the node value (int16-exact).
+  function snapPoint(lat, lon, fields) {
+    let coarsest = null;
+    for (const [field] of fields) {
+      const g = storageGrid(field, state.day);
+      if (!coarsest || g[0] < coarsest[0]) coarsest = g;
+    }
+    if (!coarsest) return { lat, lon, moved: false };
+    const dlon = 360 / (coarsest[0] - 1);
+    const dlat = 180 / (coarsest[1] - 1);
+    const slon = Math.max(-180, Math.min(180,
+      Math.round((lon + 180) / dlon) * dlon - 180));
+    const slat = Math.max(-90, Math.min(90,
+      Math.round((lat + 90) / dlat) * dlat - 90));
+    return { lat: slat, lon: slon,
+             moved: slat !== lat || slon !== lon };
+  }
+
   async function assemble(signal) {
-    const { lat, lon } = state.point;
     const n = timeline.nEpochs;
     const xs = epochTimesSec();
     const sums = [new Array(n).fill(0), new Array(n).fill(0),
@@ -479,6 +502,8 @@ export function attach({ state, manifest, globe, ui, hooks, timeline,
       if (src && src.shells.includes(state.shell)) fields.push([field, src]);
     }
     if (!fields.length) bad.fill(true);
+    const { lat, lon, moved } = snapPoint(state.point.lat, state.point.lon,
+                                          fields);
 
     const jobs = [];
     for (const [field, src] of fields) {
@@ -523,7 +548,8 @@ export function attach({ state, manifest, globe, ui, hooks, timeline,
 
     const mask = (arr) => arr.map((v, i) => (bad[i] ? null : v));
     return { xs, N: mask(sums[0]), E: mask(sums[1]), C: mask(sums[2]),
-             gaps: bad.filter(Boolean).length, units: hooks.displayUnits() };
+             gaps: bad.filter(Boolean).length, units: hooks.displayUnits(),
+             snap: { lat, lon, moved } };
   }
 
   function maybeAssemble() {
@@ -569,6 +595,10 @@ export function attach({ state, manifest, globe, ui, hooks, timeline,
     assembly = res;
     charts.hidden = false;
     hint.hidden = true;
+    const snapNote = res.snap?.moved
+      ? `sampling grid node ${res.snap.lat.toFixed(2)}°, ` +
+        `${res.snap.lon.toFixed(2)}° — exact stored values`
+      : '';
     if (res.gaps === res.xs.length) {
       status('no enabled field has data at this shell', true);
     } else if (res.gaps) {
@@ -576,7 +606,7 @@ export function attach({ state, manifest, globe, ui, hooks, timeline,
     } else if (res.xs.length <= 1) {
       status('single-epoch timeline — one sample');
     } else {
-      status('');
+      status(snapNote);
     }
     makePlots();
     refreshReadout();

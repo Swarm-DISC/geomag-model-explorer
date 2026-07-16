@@ -161,3 +161,59 @@ def test_fetch_failure_reports_error(served, monkeypatch):
         raise AssertionError("error state never reported")
     # the failed day was never published
     assert day not in client.get("/api/days").json()["days"]
+
+
+def _write_tile(tmp_path, rel: str, payload: bytes) -> Path:
+    p = tmp_path / "web" / "data" / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(payload)
+    return p
+
+
+def test_tile_headers_immutable_and_precompressed(served):
+    """Tiles are content-immutable -> long max-age; a .gz sibling is served
+    with Content-Encoding: gzip so the event loop never re-compresses."""
+    import gzip
+
+    serve, client, tmp = served
+    payload = bytes(range(256)) * 8            # 2 KB, over the gzip minimum
+    tile = _write_tile(tmp, "core/surface/2020-01-01/t00.i16", payload)
+
+    r = client.get("/data/core/surface/2020-01-01/t00.i16")
+    assert r.status_code == 200
+    assert r.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert r.content == payload                # no sibling: plain fallback
+
+    gz = tile.with_name(tile.name + ".gz")
+    gz.write_bytes(gzip.compress(payload, compresslevel=9, mtime=0))
+    r = client.get("/data/core/surface/2020-01-01/t00.i16")
+    assert r.status_code == 200
+    assert r.headers.get("content-encoding") == "gzip"
+    assert r.headers.get("vary") == "Accept-Encoding"
+    assert r.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert r.content == payload                # client-side transparent decode
+
+    # a client that refuses gzip still gets the raw tile
+    r = client.get("/data/core/surface/2020-01-01/t00.i16",
+                   headers={"Accept-Encoding": "identity"})
+    assert r.status_code == 200
+    assert "content-encoding" not in r.headers
+    assert r.content == payload
+
+
+def test_manifest_no_cache_and_parse_cache(served):
+    """manifest.json is the mutable publish point: no-cache over the wire,
+    and the server-side parse is reused until the file's stat changes."""
+    serve, client, tmp = served
+    mj = tmp / "web" / "data" / "manifest.json"
+    mj.parent.mkdir(parents=True, exist_ok=True)
+    mj.write_text(json.dumps({"default_day": None, "days": {}}))
+
+    r = client.get("/data/manifest.json")
+    assert r.status_code == 200
+    assert r.headers["cache-control"] == "no-cache"
+
+    first = serve.read_manifest()
+    assert serve.read_manifest() is first      # stat unchanged: cached parse
+    mj.write_text(json.dumps({"default_day": "2020-01-01", "days": {}}))
+    assert serve.read_manifest()["default_day"] == "2020-01-01"
