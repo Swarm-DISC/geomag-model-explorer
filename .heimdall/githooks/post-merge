@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Heimdall post-merge — local redeploy when main advances (mechanism, not policy:
+# the command is the project's, declared in .heimdall.toml [deploy] local_redeploy).
+# Installed via core.hooksPath=.heimdall/githooks by `heimdall adopt`.
+set -u
+branch=$(git symbolic-ref --short -q HEAD || true)
+[ "$branch" = "main" ] || exit 0
+cmd=$(sed -n 's/^local_redeploy[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' .heimdall.toml | head -1)
+[ -n "$cmd" ] || exit 0
+echo "[heimdall] post-merge: $cmd"
+eval "$cmd" || echo "[heimdall] local_redeploy failed (exit $?)" >&2

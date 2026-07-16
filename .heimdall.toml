@@ -44,6 +44,8 @@ link_dirs = ["data/raw", "web/data"]
 setup = "uv sync"               # each worktree gets its own .venv (uv hardlinks from its cache)
 
 [deploy]                        # emit-only deployment-setup registration
+# Run on every merge into main (post-merge githook): the LAN service follows main.
+local_redeploy = "systemctl --user restart geomag-model-explorer-web.service"
 target = "deployment-setup/experimental"
 name = "geomag-model-explorer"
 ref = "main"
