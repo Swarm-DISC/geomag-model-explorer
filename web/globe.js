@@ -17,7 +17,10 @@ export function createGlobe(container, lut, coast) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x06080f);
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 50);
-  camera.position.set(0, 0.6, 2.8);
+  // v2.14 landing re-tune: pulled back and nearly level so the whole disc
+  // sits centred in the pane (was 0, 0.6, 2.8 — bottom-cropped on wide
+  // panes). Explicit cam= permalinks are untouched.
+  camera.position.set(0, 0.3, 3.3);
 
   // Everything Earth-fixed lives in one group, so a reference frame (feature
   // `frame`, v2.12) poses the whole Earth from a single quaternion. Identity
@@ -63,6 +66,10 @@ export function createGlobe(container, lut, coast) {
   }
   resize();
   window.addEventListener('resize', resize);
+  // Portrait panes (phones) make width the limiting direction — pull the
+  // default pose back so the whole disc still fits at boot. Camera-restoring
+  // permalinks (cam=) run after createGlobe and override this.
+  if (camera.aspect < 1) camera.position.multiplyScalar(1 / camera.aspect);
 
   // radiusRe: shell radius in Earth radii. On-surface: opaque shell with
   // coastline overlay baked into the field shader. Off-surface: translucent

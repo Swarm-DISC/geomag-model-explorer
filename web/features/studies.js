@@ -1,17 +1,19 @@
-// Study selection (PLAN v2.3 + v2.9 + v2.10 + v2.11; IDEAS §9.4/§9.7): a
-// study binds a time axis + the controls that make sense for it, over the
-// one shared globe. v2.10 presents the choice as two dropdowns (inverting
-// the v2.9 tab strip): a primary "Field to explore" select (All / Core /
-// Crust / Ionosphere / Magnetosphere — v2.11) and, under `families`, a
-// secondary "Model" select. Field is primary: pick a study, then a model
-// that has data for it — a model missing the field greys out, and
-// symmetrically a field the chosen model can't serve greys out (else
-// picking it would silently discard the model choice). v2.11 covers
-// every grid-evaluable VirES model: ci and chaos stay the only multi-field
-// lenses; each remaining model is a single-field family riding one curated
-// series (docs/v211_model_probe.json), and the served-but-unevaluated
-// models (CHAOS-MIO, AMPS, MLI_SHA_2E) stay visible as permanently greyed
-// entries. With `families` off only the field select shows, over the v1
+// Study selection (PLAN v2.3 + v2.9 + v2.10 + v2.11 + v2.14; IDEAS
+// §9.4/§9.7): a study binds a time axis + the controls that make sense for
+// it, over the one shared globe. v2.14 presents the choice as a primary
+// "Explore category" pill group (All / Core / Crust / Ionosphere /
+// Magnetosphere) and, under `families`, a secondary "Model" select.
+// Category is primary and always actionable: pills never grey out — picking
+// a category the chosen model can't serve falls the model back to the first
+// family that serves it (in practice Swarm CI, which serves everything) and
+// announces the switch (flash + status chip), never silently. The Model
+// select stays the honest side: a model with no data for the current
+// category greys out with the reason. v2.11 covers every grid-evaluable
+// VirES model: ci and chaos stay the only multi-field lenses; each
+// remaining model is a single-field family riding one curated series
+// (docs/v211_model_probe.json), and the served-but-unevaluated models
+// (CHAOS-MIO, AMPS, MLI_SHA_2E) stay visible as permanently greyed
+// entries. With `families` off only the category pills show, over the v1
 // lineup. Model is a lens: it filters which series each study offers; the
 // day cache is CI-only, so kind-less tabs under non-ci lenses swap the date
 // picker for the family's diurnal series. The Core study shows exactly one
@@ -292,26 +294,39 @@ export function attach({ state, manifest, ui, hooks, timeline, features }) {
           + (FAMILY_FIELD_NOTES[`${state.family}:${field}`] ?? ''));
   }
 
-  // Primary selector: "Field to explore" (v2.10) — a dropdown over the study
-  // ids (All / Core / Ionosphere). Ids are permalink keys; labels can vary.
-  const fieldBar = document.createElement('label');
-  fieldBar.id = 'field-bar';
-  fieldBar.append('Field to explore ');
-  const fieldSelect = document.createElement('select');
-  fieldSelect.id = 'field-select';
+  // Primary selector: "Explore category" (v2.14, formerly the v2.10 "Field
+  // to explore" dropdown) — one always-enabled pill per study. Ids are
+  // permalink keys; labels can vary. Real radio inputs under the pill CSS:
+  // native keyboard/AT semantics, and the whole pill is the hit target.
+  const catLabel = document.createElement('span');
+  catLabel.className = 'ctl-label';
+  catLabel.textContent = 'Explore category';
+  const fieldPills = document.createElement('span');
+  fieldPills.id = 'field-pills';
+  fieldPills.setAttribute('role', 'radiogroup');
+  fieldPills.setAttribute('aria-label', 'explore category');
   const rendered = new Set();
+  const pillInputs = {};
   for (const tab of TABS) {
     if (tab.kind && !seriesOfKind(manifest, tab.kind).length) continue;
-    const opt = document.createElement('option');
-    opt.value = tab.id;
-    opt.textContent = tab.label;
-    fieldSelect.appendChild(opt);
+    const pill = document.createElement('label');
+    pill.className = 'pill-radio';
+    const rb = document.createElement('input');
+    rb.type = 'radio';
+    rb.name = 'field-tab';
+    rb.value = tab.id;
+    rb.id = `field-${tab.id}`;
+    rb.addEventListener('change', () => switchField(tab.id));
+    pill.append(rb, document.createTextNode(tab.label));
+    fieldPills.appendChild(pill);
+    pillInputs[tab.id] = rb;
     rendered.add(tab.id);
   }
-  fieldSelect.value = current;
-  fieldSelect.addEventListener('change', () => switchField(fieldSelect.value));
-  fieldBar.appendChild(fieldSelect);
-  document.getElementById('title').after(fieldBar);
+  function setFieldPill(id) {
+    if (pillInputs[id]) pillInputs[id].checked = true;
+  }
+  setFieldPill(current);
+  document.getElementById('slot-category').append(catLabel, fieldPills);
 
   // Secondary selector: "Model" (v2.9 family lens) — sits AFTER the field
   // dropdown. A model with no data for the current field greys out; refresh()
@@ -344,7 +359,7 @@ export function attach({ state, manifest, ui, hooks, timeline, features }) {
     familySelect.addEventListener('change', () =>
       switchFamily(familySelect.value));
     wrap.appendChild(familySelect);
-    fieldBar.after(wrap);
+    document.getElementById('slot-model').append(wrap);
   }
 
   const select = document.createElement('select');
@@ -354,8 +369,14 @@ export function attach({ state, manifest, ui, hooks, timeline, features }) {
     state.pos = 0;
     refresh();
   });
+  // "Visualisation" heads the shared slot (v2.14): the series select and
+  // the pinned date swap inside it per tab. The Ionosphere study's future
+  // Diurnal|Seasonal pair is this select's intended occupant.
+  const visLabel = document.createElement('span');
+  visLabel.className = 'ctl-label';
+  visLabel.textContent = 'Visualisation mode';
   const dateEl = document.getElementById('date-picker');
-  dateEl.before(select);             // same header slot, swapped per tab
+  dateEl.before(visLabel, select);   // same header slot, swapped per tab
 
   function populateSelect(ids) {
     select.replaceChildren();
@@ -405,8 +426,7 @@ export function attach({ state, manifest, ui, hooks, timeline, features }) {
       label.append(rb, document.createTextNode(text));
       svBar.appendChild(label);
     }
-    const togglesEl = document.getElementById('field-toggles');
-    togglesEl.after(svBar);
+    document.getElementById('slot-sv').append(svBar);
   }
 
   function refresh() {
@@ -454,29 +474,20 @@ export function attach({ state, manifest, ui, hooks, timeline, features }) {
       svBar.hidden = !tab?.exclusive;
       document.getElementById('field-toggles').hidden = !!tab?.exclusive;
     }
-    fieldSelect.value = current;
-    if (familiesOn) {
-      // grey out the fields the chosen model has no data for — symmetric
-      // with the model grey-out below. Without this, picking such a field
-      // silently swapped the model back to one that has it (e.g. All ×
-      // MMA_SHA_2F offered Crust, which landed on Swarm CI) — surprising,
-      // and it discarded the user's model choice. The active field stays
-      // enabled by construction (every entry path lands on an available
-      // tab first).
-      for (const opt of fieldSelect.options) {
-        const ok = opt.value === current
-          || tabAvailable(opt.value, state.family);
-        opt.disabled = !ok;
-        const target = TABS.find((t) => t.id === opt.value);
-        opt.title = ok ? '' : `no ${target.label} data in the `
-          + `${FAMILY_LABELS[state.family] ?? state.family} model series`
-          + (target.fields ?? [])
-            .map((f) => FAMILY_FIELD_NOTES[`${state.family}:${f}`] ?? '')
-            .join('');
-      }
+    // the row-2 label follows the swap: summing checkboxes vs the
+    // one-of B|dB/dt radio (v2.14)
+    const fieldsLabel = document.getElementById('fields-label');
+    if (fieldsLabel) {
+      fieldsLabel.textContent = tab?.exclusive
+        ? 'Field to show' : 'Fields to include';
     }
+    // category pills are never disabled (v2.14): a pill the chosen model
+    // can't serve auto-switches the model on click — switchField announces
+    // it. The old symmetric field grey-out is deliberately gone: the
+    // category is the top-level choice and must always be actionable.
+    setFieldPill(current);
     if (familiesOn && familySelect) {
-      // grey out the models that have no data for the chosen field; the
+      // grey out the models that have no data for the chosen category; the
       // unevaluated entries stay disabled with their fixed tooltip (v2.11)
       for (const opt of familySelect.options) {
         if (opt.dataset.unevaluated) continue;
@@ -539,17 +550,45 @@ export function attach({ state, manifest, ui, hooks, timeline, features }) {
     refresh();
   }
 
-  // Field is the primary selector: choose a study, keep the current model if
-  // it has data for it, else fall the model back to the first that does.
+  // A category click can pull the model out from under the user — the pills
+  // never grey out (v2.14) — so the switch is announced, never silent:
+  // pulse the Model select and name the change in a transient status chip.
+  let noteTimer = null;
+  function noteModelSwitch(from, to, tabLabel) {
+    if (!familySelect) return;
+    familySelect.classList.remove('flash');
+    void familySelect.offsetWidth;             // restart the animation
+    familySelect.classList.add('flash');
+    familySelect.addEventListener('animationend',
+      () => familySelect.classList.remove('flash'), { once: true });
+    let note = document.getElementById('model-switch-note');
+    if (!note) {
+      note = document.createElement('span');
+      note.id = 'model-switch-note';
+      note.setAttribute('role', 'status');     // implies aria-live polite
+      document.getElementById('slot-model').append(note);
+    }
+    note.textContent = `Model → ${FAMILY_LABELS[to] ?? to} — `
+      + `${FAMILY_LABELS[from] ?? from} has no ${tabLabel} data`;
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(() => note.remove(), 4000);
+  }
+
+  // Category is the primary selector: choose a study, keep the current model
+  // if it has data for it, else fall the model back to the first that does
+  // (in practice Swarm CI — it serves every field and sorts first).
   function switchField(id) {
     if (id === current) return;
     saved[snapKey(current)] = { day: state.day, pos: state.pos,
                                 enabled: { ...state.enabled },
                                 shell: state.shell };
     if (familiesOn && !tabAvailable(id, state.family)) {
+      const from = state.family;
       state.family = familiesPresent(manifest)
         .find((f) => tabAvailable(id, f)) ?? 'ci';
       if (familySelect) familySelect.value = state.family;
+      noteModelSwitch(from, state.family,
+                      TABS.find((t) => t.id === id)?.label ?? id);
     }
     enterContext(id);
   }

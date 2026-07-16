@@ -1,8 +1,9 @@
-"""Studies feature (PLAN v2.3/v2.10) against a sandboxed server (:8216) with
-the flag on: the "Field to explore" dropdown appears, the Ionosphere study
-plays the annual series (timeline swap, series picker, iono defaults),
-permalinks round-trip via tab=/series=/e=, and garbage degrades. Flag-off
-(:8217, same data) shows no field dropdown — exactly v1."""
+"""Studies feature (PLAN v2.3/v2.10/v2.14) against a sandboxed server
+(:8226) with the flag on: the "Explore category" pills appear, the
+Ionosphere study plays the annual series (timeline swap, series picker,
+iono defaults), permalinks round-trip via tab=/series=/e=, and garbage
+degrades. Flag-off (:8227, same data) shows no category pills — exactly
+v1."""
 from __future__ import annotations
 
 import json
@@ -17,8 +18,10 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parent.parent
-PORT_ON = 8216
-PORT_OFF = 8217
+# 8213-8223 are occupied by unrelated fleet services on this host (v2.13
+# finding) — the suite moved to the free range with v2.14
+PORT_ON = 8226
+PORT_OFF = 8227
 SEED_DAY = "2020-01-01"
 SERIES_ID = "mio-seasonal-2020"
 TIMEOUT_MS = 120_000
@@ -98,11 +101,11 @@ def test_tab_strip_defaults_to_daily(servers, watched_page):
     page, _errors = watched_page
     page.goto(on + "/", timeout=TIMEOUT_MS)
     _wait_ready(page)
-    # the field dropdown holds the v1 lineup and defaults to Daily
+    # the category pills hold the v1 lineup and default to Daily
     assert page.eval_on_selector_all(
-        "#field-select option", "os => os.map(o => o.value)") \
+        "#field-pills input", "is => is.map(i => i.value)") \
         == ["daily", "seasons"]
-    assert page.input_value("#field-select") == "daily"
+    assert page.is_checked("#field-daily")
     assert page.is_visible("#date-picker")
     assert page.is_hidden("#series-select")
     # the Daily timeline is untouched: 1440 one-minute ticks
@@ -114,7 +117,7 @@ def test_seasons_tab_plays_the_series(servers, watched_page):
     page, _errors = watched_page
     page.goto(on + "/", timeout=TIMEOUT_MS)
     _wait_ready(page)
-    page.select_option("#field-select", "seasons")
+    page.check("#field-seasons")
     # study defaults: iono on, the series becomes the day, slider ticks in days
     assert page.evaluate("() => window.geomagModelExplorer.state.day") == SERIES_ID
     assert page.is_checked("#toggle-iono")
@@ -134,7 +137,7 @@ def test_seasons_tab_plays_the_series(servers, watched_page):
         "() => Math.abs(window.geomagModelExplorer.timePos() - 26) < 1e-6",
         timeout=TIMEOUT_MS)
     # back to Daily: the v1 transport returns and the gate lifts
-    page.select_option("#field-select", "daily")
+    page.check("#field-daily")
     assert page.evaluate("() => window.geomagModelExplorer.state.day") == SEED_DAY
     assert page.get_attribute("#time-slider", "max") == "1440"
     assert page.is_visible("#date-picker")
@@ -171,7 +174,7 @@ def test_seasons_permalink_roundtrip(servers, watched_page):
                                 **{f: False for f in state["enabled"]
                                    if f not in ("core", "crust",
                                                 "iono", "magneto")}}
-    assert page.input_value("#field-select") == "seasons"
+    assert page.is_checked("#field-seasons")
     assert page.text_content("#time-label") == "2020-07-01"
     # the write-back keeps the series keys (and drops day=/t=)
     page.wait_for_function(
@@ -180,7 +183,7 @@ def test_seasons_permalink_roundtrip(servers, watched_page):
         "location.hash.includes('e=2020-07-01T12:00') && "
         "!location.hash.includes('day=')", timeout=TIMEOUT_MS)
     # switching to Daily swaps the hash back to v1 keys
-    page.select_option("#field-select", "daily")
+    page.check("#field-daily")
     page.wait_for_function(
         f"() => location.hash.includes('day={SEED_DAY}') && "
         "!location.hash.includes('series=')", timeout=TIMEOUT_MS)
@@ -193,17 +196,83 @@ def test_garbage_series_hash_degrades(servers, watched_page):
     _wait_ready(page)
     state = page.evaluate("() => window.geomagModelExplorer.state")
     assert state["day"] == SEED_DAY
-    assert state["pos"] == 0
-    assert page.input_value("#field-select") == "daily"
+    # garbage lands on the boot default — pos 32 (08:00 UT) since the v2.12
+    # landing-view tune (same stale expectation 95eda4c fixed in the
+    # permalink suite; latent here while the old port made the suite unrunnable)
+    assert state["pos"] == 32
+    assert page.is_checked("#field-daily")
 
 
-def test_flag_off_has_no_field_dropdown(servers, watched_page):
+def test_flag_off_has_no_category_pills(servers, watched_page):
     _on, off = servers
     page, _errors = watched_page
     page.goto(off + "/", timeout=TIMEOUT_MS)
     _wait_ready(page)
-    assert page.evaluate("() => document.getElementById('field-select')") is None
+    assert page.evaluate("() => document.getElementById('field-pills')") is None
     assert page.evaluate("() => document.getElementById('series-select')") \
         is None
     assert page.evaluate("() => window.geomagModelExplorer.state.day") == SEED_DAY
     assert page.get_attribute("#time-slider", "max") == "1440"
+
+
+def test_chrome_collapse_toggles(servers, watched_page):
+    """v2.14: the header and the vis-options box fold away (mobile chrome;
+    never in the permalink). Desktop sizes boot expanded."""
+    on, _off = servers
+    page, _errors = watched_page
+    page.goto(on + "/", timeout=TIMEOUT_MS)
+    _wait_ready(page)
+    assert not page.eval_on_selector(
+        "#controls", "e => e.classList.contains('collapsed')")
+    page.click("#controls-toggle")
+    assert page.is_hidden("#field-pills")
+    assert page.is_visible("#title")
+    page.click("#vis-options-toggle")
+    assert page.is_hidden("#component-radios")
+    page.click("#controls-toggle")
+    assert page.is_visible("#field-pills")
+    page.click("#vis-options-toggle")
+    assert page.is_visible("#component-radios")
+
+
+def test_chrome_boots_collapsed_on_phones(servers, watched_page):
+    on, _off = servers
+    page, _errors = watched_page
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(on + "/", timeout=TIMEOUT_MS)
+    _wait_ready(page)
+    for box in ("#controls", "#vis-options"):
+        assert page.eval_on_selector(
+            box, "e => e.classList.contains('collapsed')"), box
+    page.click("#controls-toggle")
+    assert page.is_visible("#field-pills")
+
+
+def test_view_reset_restores_defaults(servers, watched_page):
+    """v2.14: the ⌂ chip resets EVERYTHING — it wipes the permalink hash and
+    reloads, so every selection, overlay and the camera return to the boot
+    defaults (the boot path is the definition of the default state)."""
+    on, _off = servers
+    page, _errors = watched_page
+    page.goto(on + f"/#tab=seasons&series={SERIES_ID}&e=2020-07-01T12:00"
+              "&f=iono&c=N&s=surface&cam=1.500,1.500,1.500",
+              timeout=TIMEOUT_MS)
+    _wait_ready(page)
+    assert page.evaluate(
+        "() => window.geomagModelExplorer.state.component") == "N"
+    with page.expect_navigation():
+        page.click("#view-reset")
+    _wait_ready(page)
+    state = page.evaluate("() => window.geomagModelExplorer.state")
+    assert state["day"] == SEED_DAY          # the day cache, not the series
+    assert state["pos"] == 32                # 08:00 UT boot (v2.12 tune)
+    assert state["component"] == "Up"
+    assert state["shell"] == "h500"
+    assert state["enabled"]["core"] and state["enabled"]["iono"]
+    assert page.is_checked("#field-daily")
+    pos = page.evaluate(
+        "() => window.geomagModelExplorer.globe.camera.position.toArray()")
+    assert pos[0] == 0 and abs(pos[1] - 0.3) < 1e-9 \
+        and abs(pos[2] - 3.3) < 1e-9, pos
+    # NOT asserting an empty hash: the live write-back re-encodes the
+    # (now-default) state into the hash within the debounce window

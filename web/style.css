@@ -23,13 +23,44 @@ body {
 
 /* ---- top control strip ---- */
 #controls {
+  position: relative;          /* anchors the collapse toggle */
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 0.35rem;               /* vertical gap between the two rows */
-  padding: 0.4rem 0.9rem;
+  padding: 0.4rem 2.8rem 0.4rem 0.9rem;   /* right: room for the toggle */
   background: var(--panel);
   border-bottom: 1px solid #1c2438;
+}
+
+/* collapsible chrome (v2.14: mobile) — small square toggles; ui.js flips
+   the glyph/UA state, CSS does the hiding */
+.chrome-toggle {
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid #2a3552;
+  border-radius: 4px;
+  width: 1.7rem;
+  height: 1.7rem;
+  line-height: 1;
+  font-size: 0.9rem;
+  cursor: pointer;
+  flex: none;
+}
+
+.chrome-toggle:hover { color: var(--accent); border-color: var(--accent); }
+
+#controls-toggle {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.9rem;
+}
+
+/* collapsed header: a slim strip — the title, the ⌂ reset chip and the
+   toggle stay; everything else folds away */
+#controls.collapsed #controls-secondary,
+#controls.collapsed #controls-primary > :not(#title, #view-reset) {
+  display: none;
 }
 
 .controls-row {
@@ -63,6 +94,77 @@ fieldset {
 
 .field-toggle.unavailable { color: var(--muted); cursor: not-allowed; }
 
+/* segmented pills — the Explore category group only (v2.14; the plain
+   .comp-radio look stays on component/frame/SV by explicit decision).
+   The real radio input covers the whole pill invisibly: the full pill is
+   the hit target, keyboard/AT semantics are native, and Playwright's
+   page.check() keeps working (opacity is ignored by its visibility check —
+   never display:none or zero-size here). */
+.pill-radio {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.7rem;
+  border: 1px solid #2a3552;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.pill-radio input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.pill-radio:hover { color: var(--text); }
+
+.pill-radio:has(input:checked) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pill-radio:has(input:focus-visible) {
+  outline: 2px solid #8fa3cc;
+  outline-offset: 1px;
+}
+
+#field-pills {
+  display: inline-flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+/* control-strip labels ("Explore category", "Fields to include",
+   "Visualisation") and feature-filled slots; empty slots collapse so
+   flag-off deploys keep a clean row (no stray flex gaps) */
+.ctl-label {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+.ctl-slot { display: inline-flex; align-items: center; gap: 0.5rem; }
+.ctl-slot:empty { display: none; }
+
+/* vertical separator between row-2 groups (fields-to-include | visualisation
+   mode); the margin adds breathing room beyond the row gap */
+.ctl-divider {
+  width: 1px;
+  align-self: stretch;
+  background: #2a3552;
+  margin: 0 0.8rem;
+}
+
+/* the SV bar inside is hidden per tab — display:contents keeps the slot
+   from holding a zero-size box (and a stray flex gap) while it is */
+#slot-sv { display: contents; }
+
 /* reference-frame radios (feature `frame`) — grouped like a fieldset */
 #frame-toggle {
   display: inline-flex;
@@ -73,6 +175,89 @@ fieldset {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+/* visualisation options (v2.14 layer 3): floating box, top-left of the
+   globe — component / sunlight+relief / frame. The top corners are free:
+   #shell-control and #colorbar are vertically centered. */
+#vis-options {
+  position: absolute;
+  left: 0.8rem;
+  top: 0.8rem;
+  z-index: 1;
+  background: rgba(13, 18, 32, 0.7);
+  padding: 0.5rem 2.6rem 0.5rem 0.7rem;   /* right: room for the toggle */
+  border-radius: 6px;
+  font-size: 0.85em;
+}
+
+#vis-options-toggle {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+}
+
+#vis-options-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+/* collapsed: just the ⚙ toggle in the corner of a small panel */
+#vis-options.collapsed { padding: 0.3rem; }
+#vis-options.collapsed #vis-options-body { display: none; }
+#vis-options.collapsed #vis-options-toggle { position: static; }
+
+#vis-options fieldset {
+  flex-wrap: wrap;
+  max-width: 13rem;
+}
+
+/* the box annotations read at the box's own size (v2.14 refinement) */
+#vis-options .ctl-label { font-size: 1em; }
+
+#vis-options .vis-divider {
+  border: 0;
+  border-top: 1px solid #2a3552;
+  width: 100%;
+  margin: 0.15rem 0;
+}
+
+#slot-flags {
+  display: flex;
+  gap: 0.7rem;
+}
+
+#slot-flags:empty, #slot-frame:empty { display: none; }
+
+/* short windows: the vertically-centered shell slider climbs into the
+   top-left corner — lay the box out as a wrapping row to the RIGHT of the
+   shell column (which keeps the corner), and drop the hover readout below
+   the row so neither overlaps */
+@media (max-height: 640px) {
+  #vis-options {
+    left: 7.5rem;
+    max-width: calc(100% - 21rem);   /* clear of the stepped-left ⓘ too */
+  }
+
+  #vis-options-body {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.9rem;
+    flex-wrap: wrap;
+  }
+
+  /* the section divider turns vertical in the row layout */
+  #vis-options .vis-divider {
+    width: 1px;
+    align-self: stretch;
+    border-top: 0;
+    border-left: 1px solid #2a3552;
+    margin: 0 0.2rem;
+  }
+
+  #readout { top: 4.6rem; }
 }
 
 /* shell control: vertical overlay pinned to the globe's left edge
@@ -126,20 +311,6 @@ fieldset {
 }
 
 /* ---- study selection (studies feature; injected by features/studies.js) ---- */
-#field-bar {
-  color: var(--muted);
-  font-size: 0.85em;
-  margin-right: 0.5rem;
-}
-
-#field-select {
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid #2a3552;
-  border-radius: 4px;
-  padding: 0.1rem 0.3rem;
-}
-
 #series-select {
   background: var(--bg);
   color: var(--text);
@@ -166,6 +337,24 @@ fieldset {
 
 #family-select option:disabled {
   color: var(--muted);
+}
+
+/* a category click auto-switched the model (v2.14): pulse the select and
+   show a transient chip naming the switch — never silent */
+#family-select.flash {
+  animation: model-flash 0.45s ease 2;
+}
+
+@keyframes model-flash {
+  50% { border-color: var(--accent); color: var(--accent); }
+}
+
+#model-switch-note {
+  background: #233055;
+  border-radius: 999px;
+  padding: 0.1rem 0.7rem;
+  font-size: 0.85em;
+  color: var(--text);
 }
 
 #sv-toggle {
@@ -245,9 +434,12 @@ fieldset {
   color: var(--accent);
 }
 
+/* hover readout: top-center (v2.14 — the top-left corner belongs to
+   #vis-options, top-right to the ⓘ button) */
 #readout {
   position: absolute;
-  left: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
   top: 0.8rem;
   background: rgba(13, 18, 32, 0.75);
   padding: 0.3rem 0.7rem;
@@ -323,23 +515,39 @@ fieldset {
 
 /* Model-info ⓘ button + dialog (feature `modelinfo`, v2.11). The native
    <dialog> renders in the top layer, so it needs no z-index management
-   against the app's z-index:1 overlays. */
+   against the app's z-index:1 overlays. The button is an overlay embedded
+   in the view pane's top-right corner (v2.14). */
 #model-info-btn {
-  background: var(--bg);
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  z-index: 1;
+  background: rgba(13, 18, 32, 0.7);
   color: var(--text);
   border: 1px solid #2a3552;
   border-radius: 50%;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 4.4rem;
+  height: 4.4rem;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 2.4rem;
   line-height: 1;
-  margin-left: 0.35rem;
 }
 
 #model-info-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* short windows: the vertically-centered colorbar spans nearly the whole
+   globe — the ⓘ shrinks AND steps left of it. Must come AFTER the base
+   rule above: same specificity, so source order decides. */
+@media (max-height: 640px) {
+  #model-info-btn {
+    width: 2.6rem;
+    height: 2.6rem;
+    font-size: 1.4rem;
+    right: 7.5rem;               /* the colorbar + labels column is ~6rem */
+  }
 }
 
 dialog#model-info {
@@ -397,6 +605,39 @@ dialog#model-info::backdrop { background: rgba(6, 8, 15, 0.65); }
 
 #model-info .mi-model { margin: 0; }
 
+/* the exact VirES model string per layer (v2.14): selectable everywhere,
+   copy button only where the clipboard API exists (https/localhost) */
+#model-info .mi-expr {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.2rem 0;
+}
+
+#model-info .mi-expr code {
+  background: var(--bg);
+  border: 1px solid #2a3552;
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.8rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  user-select: all;
+}
+
+#model-info .mi-copy {
+  background: none;
+  border: 1px solid #2a3552;
+  border-radius: 4px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  flex: none;
+}
+
+#model-info .mi-copy:hover { color: var(--accent); border-color: var(--accent); }
+
 #model-info .mi-meta {
   margin: 0;
   color: var(--muted);
@@ -405,6 +646,7 @@ dialog#model-info::backdrop { background: rgba(6, 8, 15, 0.65); }
 #model-info .mi-note { margin: 0.2rem 0 0; }
 
 #model-info .mi-footer,
+#model-info .mi-docs,
 #model-info .mi-attr {
   margin: 0.75rem 0 0;
   color: var(--muted);

@@ -60,8 +60,8 @@ const RELIEF_RADII = 0.15;
 const FEATURE_MODULES = {
   permalink: () => import('./features/permalink.js'),
   studies: () => import('./features/studies.js'),
-  // after studies: its ⓘ button anchors to the #family-bar/#field-bar
-  // header slots that studies' attach() builds
+  // anchors are static index.html slots since v2.14 (no ordering constraint
+  // on modelinfo anymore; entry order kept for stable attach telemetry)
   modelinfo: () => import('./features/model-info.js'),
   // before sun: frame's change listener poses the earth group that sun's
   // listener reads for the world-space light direction (listeners run in
@@ -110,6 +110,15 @@ async function main() {
   setDecodeHook((tex) => globe.renderer.initTexture(tex));
   globe.controls.addEventListener('change', () => { state.dirty = true; });
   window.addEventListener('resize', () => { state.dirty = true; });
+  // Reset chip (v2.14): back to the full boot defaults — every selection,
+  // overlay and the camera. The boot path IS the definition of the default
+  // state, so wipe the permalink hash and reload rather than duplicating
+  // per-feature reset logic that would drift.
+  document.getElementById('view-reset').addEventListener('click', () => {
+    history.replaceState(null, '', window.location.pathname
+                                   + window.location.search);
+    window.location.reload();
+  });
 
   // Feature restore stage: before the UI is built, so controls initialize
   // from the (possibly feature-mutated) state.

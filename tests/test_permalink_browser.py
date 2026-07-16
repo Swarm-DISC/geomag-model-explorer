@@ -1,6 +1,6 @@
-"""Permalink feature (PLAN v2.1) against a sandboxed server (:8214) with the
+"""Permalink feature (PLAN v2.1) against a sandboxed server (:8232) with the
 flag on: a hash restores state + camera before the UI builds, interactions
-write the hash back, garbage degrades to defaults, and flag-off (:8215, same
+write the hash back, garbage degrades to defaults, and flag-off (:8233, same
 data) is byte-for-byte v1 behavior."""
 from __future__ import annotations
 
@@ -16,8 +16,10 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parent.parent
-PORT_ON = 8214
-PORT_OFF = 8215
+# 8213-8223 are occupied by unrelated fleet services on this host (v2.13
+# finding) — the suite moved to the free range with v2.14
+PORT_ON = 8232
+PORT_OFF = 8233
 SEED_DAY = "2020-01-01"
 TIMEOUT_MS = 120_000
 
@@ -162,7 +164,7 @@ def test_garbage_hash_degrades_to_defaults(servers, watched_page):
     _wait_ready(page)
     state = page.evaluate("() => window.geomagModelExplorer.state")
     assert state["day"] == SEED_DAY          # manifest default
-    assert state["pos"] == 0
+    assert state["pos"] == 32                # boot default (08:00 UT, v2.12)
     assert state["component"] == "Up"
     assert state["shell"] == "h500"
     assert state["enabled"]["crust"] is True

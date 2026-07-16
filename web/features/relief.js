@@ -22,7 +22,7 @@ export function attach({ state, hooks }) {
   cb.checked = state.relief;
   cb.addEventListener('change', () => hooks.setRelief(cb.checked));
   label.append(cb, document.createTextNode('Relief'));
-  document.getElementById('component-radios').after(label);
+  document.getElementById('slot-flags').append(label);
 
   if (state.relief) hooks.setRelief(true);   // restored from the permalink
 }

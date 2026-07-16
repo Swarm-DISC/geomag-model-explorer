@@ -99,9 +99,144 @@ Carried forward — still open, not yet decisions:
 
 ## 3. Next phases
 
-**None approved.** [`IDEAS.md`](./IDEAS.md) is the candidate backlog; items
-are promoted into numbered phases here only on human approval, with the
-decision date recorded.
+One phase approved below. [`IDEAS.md`](./IDEAS.md) is the candidate backlog;
+items are promoted into numbered phases here only on human approval, with the
+decision date recorded. (v2.13, the timeline viewer, is approved and verified
+on its own branch `timeline-viewer`, not yet merged — its spec lives in that
+branch's PLAN.md; the number stays claimed.)
+
+### Phase v2.14 — Interface reorganization (three control layers)
+
+**Approved 2026-07-15** (direct user request; RULES §8 gate satisfied by
+construction). Branch: `interface-improve`, from `main`/v2.12 by explicit
+user decision — NOT stacked on the unmerged `timeline-viewer`.
+
+**Why.** The header grew one control at a time (v2.9–v2.12): two dropdowns,
+four checkbox/radio groups and three display toggles share two
+undifferentiated rows, and the primary choice — what to explore — is a
+dropdown whose options grey out, so the top-level action can be
+un-clickable. Reorganize into three intent layers without changing what any
+control does.
+
+**Shape.**
+- Layer 1 (header row 1) — *what to explore*: "Explore category" as an
+  always-enabled pill group (All / Core / Crust / Ionosphere / Magnetosphere;
+  same tab ids) + "Model" (unchanged `<select>`; unavailable models stay
+  greyed with the reason). Clicking a category the current model cannot
+  serve auto-switches the model (the existing `switchField` fallback) and
+  says so: the Model select flashes and a transient `aria-live` note names
+  the switch ("Model → Swarm CI — IGRF has no Ionosphere data").
+- Layer 2 (header row 2) — *what is in the sum*: "Fields to include"
+  checkboxes ("Field to show" + B ↔ dB/dt swap on Core, as today), then a
+  vertical separator, then "Visualisation mode" (today's series select,
+  relabeled and labeled — entries unchanged this phase; an Ionosphere
+  Diurnal|Seasonal pair is the intended future occupant) + the pinned date
+  + fetch chip.
+- Layer 3 — *how it is drawn*: a floating `#vis-options` box overlaid
+  top-left of the globe, annotated in two sections split by a divider —
+  "Magnetic field component:" (N/E/Up/Intensity) and "Display options:"
+  (Sunlight, Relief, ECEF (earth-fixed) | ECI (inertial)). The hover
+  readout moves to top-center (top corners are free: shell slider and
+  colorbar are vertically centered).
+- The ⓘ button becomes a hard-to-miss 4.4rem overlay at the globe's
+  top-right (2.6rem on short windows, clearing the colorbar); the modal
+  designates each layer's exact VirES expression as a copyable `<code>`
+  line and links the viresclient model catalogue
+  (readthedocs `available_parameters.html#models`).
+  (Sizes/annotations refined per user review of the live preview,
+  2026-07-15.)
+- The header and the vis-options box are collapsible (static `.chrome-toggle`
+  buttons, wired in ui.js — chrome state only, never in the permalink);
+  viewports ≤ 640 px wide boot collapsed, so phones land on a slim title
+  bar + ⚙ chip over a full globe. The default camera pulls back to
+  (0, 0.3, 3.3) — the whole disc lands centred (the v2.12 pose cropped the
+  bottom) — and portrait panes scale the pull-back by 1/aspect at boot;
+  explicit cam= permalinks override both. A ⌂ reset chip in the header row,
+  just before "Explore category" (kept visible in the collapsed strip, so
+  phones retain one-tap reset), resets the WHOLE session to the boot
+  defaults — every selection, overlay and the camera — by wiping the
+  permalink hash and reloading: the boot path is the definition of the
+  default state, so nothing can drift as features grow.
+  (Added per user review, 2026-07-15.)
+- Structural: header and vis box become explicit static containers/slots in
+  index.html; features append into named slots — the `.after()` anchor
+  chains (title←field-bar←family-bar←ⓘ; component-radios←relief←sun←frame,
+  order = reverse module order) are retired.
+- Pills are restyled real radio inputs (new `.pill-radio`, category group
+  only — `.comp-radio` groups keep their look by explicit user decision
+  2026-07-15; same decision scoped Visualisation to relabel-only).
+
+**Contract & invariants.**
+- Zero permalink changes: no key added or removed; every pre-v2.14 link
+  restores identically. No new feature flag (the reorg is chrome for
+  existing flagged features); flag-off shapes degrade as today — empty
+  slots collapse invisibly.
+- Category pills are never disabled; the Model select remains the honest
+  side (greyed + reason). A model auto-switch is always announced, never
+  silent.
+- `state.*` keys and all control ids stable except: `#field-select` /
+  `#field-bar` are retired → `#field-pills` group + `#field-<tabid>` radios
+  (documented breaking id).
+- Merge-friendliness with `timeline-viewer`: zero diff on permalink.js /
+  ui.js / dataset.js / web/sun.js; style.css edits kept above v2.13's
+  EOF-appended block. **Post-merge follow-up (one small commit):** v2.13's
+  `body[data-view="series"] #globe{display:none}` would hide the ⓘ — wrap
+  `#globe` + `#series-panel` in a `#viewport` and reparent `#model-info-btn`
+  there (`#vis-options` staying globe-only is correct: all three of its
+  controls are globe-display options). Its view toggle self-parks at row 1's
+  right edge via `margin-left:auto` — the correct slot.
+
+**Verification.** Updated `test_studies_browser.py` /
+`test_families_browser.py` (pill interactions, never-disabled assertion,
+auto-switch + note, modal expression + docs link; new fixtures on ports
+≥ 8226 — 8213–8223 are dead on this host, v2.13 finding); then the real
+gate: LAN :8300 branch-preview pass with real data (landing layout,
+auto-switch feedback, modal expressions verbatim from the manifest,
+pre-v2.14 permalink shapes, narrow/short-window stress, keyboard focus),
+screenshots to `tests/artifacts/live_v214_*.png`, record here.
+
+**Out of scope:** the timeline-viewer merge itself; Ionosphere
+Diurnal|Seasonal entries (future occupant of the Visualisation select);
+propagating pill styling to other radio groups; date-picker revival; model
+pills; new series exports.
+
+*Verified 2026-07-15*: browser suites green on the moved ports — studies 6,
+permalink 5, families 18 (8226–8233; the old 8213–8223 fixtures probed
+foreign fleet services and timed out); fast suites 54 green. Becoming
+runnable surfaced three latent stale expectations (garbage/refused links
+leave the boot default in charge, and boot pos is 32 since the v2.12
+landing-view tune — same family as 95eda4c); fixed in place. Real-data pass
+on the :8300 `interface-improve` container (scripted Chromium, 39 checks,
+zero console errors): three-layer landing, pills never disabled, IGRF →
+Ionosphere auto-switch with the verbatim chip text and transient clear,
+Model-side grey-out intact, modal expressions byte-equal to
+`manifest.models` (MIO_SHA_2C composite, CHAOS-MMA Primary+Secondary sum),
+viresclient catalogue link + copy button (secure context), v1 / series /
+lens-only permalink shapes restore identically, 700 px wrap clean, arrow
+keys walk the pills. One layout fix landed en route: at ≤ 640 px height the
+wrapped vis-options row overlapped the shell column — it now starts at
+7.5rem with the hover readout dropped below it. Screenshots
+`tests/artifacts/live_v214_*.png`.
+
+*Refinement pass, same day* (user review of the live preview): ⓘ to
+4.4rem, vis box annotated in two divided sections, frame radios spell out
+earth-fixed/inertial, row 2 gains a vertical separator and the
+"Visualisation mode" name. Re-verified: suites green, 47 scripted preview
+checks, zero console errors. Two short-window regressions caught by the
+extended checks and fixed: the ⓘ media override lost to the later base
+rule on source order, and the stepped-left ⓘ needed the colorbar column
+(~6rem) plus a narrower vis panel to land in clear space.
+
+*Second refinement pass, same day* (user review): collapsible header +
+vis box, the camera re-tune, and the ⌂ reset-view chip (bullets above).
+Re-verified: studies suite 9 green incl. two collapse tests and the
+full-reset round-trip (a non-default session → boot defaults: selections,
+camera, pill, hash reload); 58 scripted preview checks, zero console
+errors — desktop toggles fold/unfold with the canvas
+reflowing, a 390×844 page boots collapsed on a full centred disc
+(`live_v214_mobile.png`), 700×500 overlay geometry stays clear. Known
+cosmetic limit: the *expanded* vis box on a phone overlays the shell
+panel — it is a dismissible translucent overlay, accepted for now.
 
 On the slate (IDEAS-only, not approved): Storms tab + indices (the `window`
 series kind, `fetch.py --indices` + strip chart, curated storm window

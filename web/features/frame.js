@@ -16,9 +16,9 @@ import { displayedUT } from '../sun.js';
 const DEG = Math.PI / 180;
 const EPS = 1e-5;                  // quaternion settle threshold
 const FRAMES = [
-  { id: 'ecef', label: 'ECEF',
+  { id: 'ecef', label: 'ECEF (earth-fixed)',
     title: 'Earth-fixed: the globe stands still' },
-  { id: 'eci', label: 'ECI',
+  { id: 'eci', label: 'ECI (inertial)',
     title: 'Inertial: the globe rotates 15°/hr; the sun holds still' },
 ];
 
@@ -69,7 +69,7 @@ export function attach({ state, manifest, globe, onChange }) {
     label.append(rb, document.createTextNode(fr.label));
     wrap.appendChild(label);
   }
-  document.getElementById('component-radios').after(wrap);
+  document.getElementById('slot-frame').append(wrap);
 
   onChange(update);
   update();                        // restored from the permalink

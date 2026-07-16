@@ -77,7 +77,7 @@ export function attach({ state, manifest, globe, features, onChange }) {
   cb.checked = state.sun;
   cb.addEventListener('change', () => setSun(cb.checked));
   label.append(cb, document.createTextNode('Sunlight'));
-  document.getElementById('component-radios').after(label);
+  document.getElementById('slot-flags').append(label);
 
   onChange(() => { if (state.sun) update(); });
   if (state.sun) setSun(true);                 // restored from the permalink

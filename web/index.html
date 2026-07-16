@@ -11,13 +11,25 @@
 </head>
 <body>
 <header id="controls">
+  <button id="controls-toggle" class="chrome-toggle" type="button"
+    aria-expanded="true" aria-controls="controls"
+    title="Hide controls">▴</button>
+  <!-- layer 1: what to explore — category pills + model (features/studies.js
+       fills the slots; empty slots collapse on flag-off deploys) -->
   <div class="controls-row" id="controls-primary">
     <span id="title">Geomag Model Explorer</span>
-    <!-- studies.js injects #field-bar (Field to explore) + #family-bar (Model) after #title -->
+    <button id="view-reset" class="chrome-toggle" type="button"
+      title="Reset to defaults">⌂</button>
+    <span class="ctl-slot" id="slot-category"></span>
+    <span class="ctl-slot" id="slot-model"></span>
   </div>
+  <!-- layer 2: what is in the sum — field checkboxes (B|dB/dt swap in
+       #slot-sv on Core) + the Visualisation series select + pinned date -->
   <div class="controls-row" id="controls-secondary">
+    <span class="ctl-label" id="fields-label">Fields to include</span>
     <fieldset id="field-toggles" aria-label="fields"></fieldset>
-    <fieldset id="component-radios" aria-label="component"></fieldset>
+    <span class="ctl-slot" id="slot-sv"></span>
+    <span class="ctl-divider" aria-hidden="true"></span>
     <div id="date-control">
       <input type="date" id="date-picker">
       <span id="fetch-chip" hidden></span>
@@ -26,6 +38,21 @@
 </header>
 
 <main id="globe">
+  <!-- layer 3: how it is drawn — floating box, top-left of the globe
+       (component here; sun/relief fill #slot-flags, frame fills #slot-frame) -->
+  <div id="vis-options">
+    <button id="vis-options-toggle" class="chrome-toggle" type="button"
+      aria-expanded="true" aria-controls="vis-options"
+      title="Hide visualisation options">✕</button>
+    <div id="vis-options-body">
+      <span class="ctl-label">Magnetic field component:</span>
+      <fieldset id="component-radios" aria-label="component"></fieldset>
+      <hr class="vis-divider">
+      <span class="ctl-label">Display options:</span>
+      <div id="slot-flags"></div>
+      <div id="slot-frame"></div>
+    </div>
+  </div>
   <div id="shell-control">
     <label for="shell-slider">Shell altitude</label>
     <input type="range" id="shell-slider" min="0" max="0" step="1" value="0">

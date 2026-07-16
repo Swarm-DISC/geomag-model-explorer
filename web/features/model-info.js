@@ -1,15 +1,17 @@
-// Model-info modal (IDEAS §6.2 "Model-caveat panel", shipped v2.11): an ⓘ
-// button beside the Model dropdown opens a native <dialog> that tells the
-// truth about what is on screen — the served model behind each layer of the
-// active context, its degree range and validity (manifest v4 "models"), the
-// grid/cadence/storage ranges, and one honest caveat paragraph per model.
-// It also lists what VirES serves that this app deliberately does not
-// evaluate, so the catalog coverage is auditable from the UI itself.
+// Model-info modal (IDEAS §6.2 "Model-caveat panel", shipped v2.11; v2.14
+// repositioned): an ⓘ button embedded top-right of the view pane opens a
+// native <dialog> that tells the truth about what is on screen — the served
+// model behind each layer of the active context, the exact VirES expression
+// it evaluates (copyable, linked to the viresclient model catalogue), its
+// degree range and validity (manifest v4 "models"), the grid/cadence/storage
+// ranges, and one honest caveat paragraph per model. It also lists what VirES serves that
+// this app deliberately does not evaluate, so the catalog coverage is
+// auditable from the UI itself.
 //
 // attach()-only: the dialog holds no permalink state. <dialog>.showModal()
 // gives the focus trap, Esc handling, focus restore and top-layer rendering
 // for free — no contest with the app's z-index:1 overlays, no dependencies.
-// Works on studies-off deploys too (CI day-cache lineup, #title anchor).
+// The #globe anchor is static HTML, so this works on every flag shape.
 
 import { FIELD_LABELS } from '../ui.js';
 import { FAMILY_LABELS, FAMILY_ATTRIBUTION } from './studies.js';
@@ -87,18 +89,13 @@ function fmtValidity(meta) {
 }
 
 export function attach({ state, manifest }) {
-  const anchor = document.getElementById('family-bar')
-    ?? document.getElementById('field-bar')
-    ?? document.getElementById('title');
-  if (!anchor) return;
-
   const btn = document.createElement('button');
   btn.id = 'model-info-btn';
   btn.type = 'button';
   btn.title = 'About the model on display';
   btn.setAttribute('aria-label', 'About the model on display');
   btn.textContent = 'ⓘ';
-  anchor.after(btn);
+  document.getElementById('globe').appendChild(btn);
 
   const dialog = document.createElement('dialog');
   dialog.id = 'model-info';
@@ -134,9 +131,18 @@ export function attach({ state, manifest }) {
       const validity = fmtValidity(meta);
       const off = state.enabled?.[field]
         ? '' : ' <span class="mi-off">(not displayed)</span>';
+      // the expression gets its own copyable row (v2.14): it is the exact
+      // string handed to viresclient, so it must be verbatim and liftable.
+      // The copy button needs the clipboard API (https/localhost only —
+      // absent on the http LAN preview, where user-select:all still works).
+      const canCopy = !!navigator.clipboard;
       const rows = [
-        model && `<p class="mi-model"><strong>${esc(model)}</strong>`
-          + (meta?.expression ? ` — ${esc(meta.expression)}` : '') + '</p>',
+        model && `<p class="mi-model"><strong>${esc(model)}</strong></p>`,
+        meta?.expression && '<div class="mi-expr">'
+          + `<code>${esc(meta.expression)}</code>`
+          + (canCopy ? '<button class="mi-copy" type="button"'
+            + ' title="copy the VirES model string">⧉</button>' : '')
+          + '</div>',
         `<p class="mi-meta">${[
           validity && `valid ${esc(validity)}`,
           spec.grid && `grid ${spec.grid[0]}×${spec.grid[1]}`,
@@ -157,10 +163,25 @@ export function attach({ state, manifest }) {
       + `<p class="mi-context">${esc(ctxLabel)}</p>`
       + sections
       + `<p class="mi-footer">${ALSO_SERVED}</p>`
+      + '<p class="mi-docs">Each model string above is the exact expression '
+      + 'evaluated via viresclient — see the <a href="https://viresclient.'
+      + 'readthedocs.io/en/latest/available_parameters.html#models" '
+      + 'target="_blank" rel="noopener">viresclient model catalogue</a>.</p>'
       + `<p class="mi-attr">${FAMILY_ATTRIBUTION[fam]
         ?? FAMILY_ATTRIBUTION.ci}</p>`;
     dialog.querySelector('#model-info-close')
       .addEventListener('click', () => dialog.close());
+    // reads the sibling <code> rather than a data attribute: expressions
+    // hold single quotes, which have no business inside HTML attributes
+    for (const b of dialog.querySelectorAll('.mi-copy')) {
+      b.addEventListener('click', () => {
+        navigator.clipboard.writeText(b.previousElementSibling.textContent)
+          .then(() => {
+            b.textContent = '✓';
+            setTimeout(() => { b.textContent = '⧉'; }, 1200);
+          });
+      });
+    }
   }
 
   btn.addEventListener('click', () => {

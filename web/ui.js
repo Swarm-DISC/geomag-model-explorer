@@ -216,6 +216,30 @@ export function initUI(state, manifest, hooks, timeline) {
   });
   refreshLockBtn();
 
+  // --- collapsible chrome (v2.14: mobile) ---------------------------------
+  // The header and the vis-options box fold away to reclaim globe space;
+  // small screens boot collapsed. Pure chrome — never in the permalink.
+  function wireCollapse(boxId, btnId, glyphs, label) {
+    const box = $(boxId);
+    const btn = $(btnId);
+    if (!box || !btn) return;
+    const apply = (collapsed) => {
+      box.classList.toggle('collapsed', collapsed);
+      btn.setAttribute('aria-expanded', String(!collapsed));
+      btn.textContent = collapsed ? glyphs[0] : glyphs[1];
+      btn.title = `${collapsed ? 'Show' : 'Hide'} ${label}`;
+      // the globe pane grows/shrinks with the header — reuse the window
+      // resize path (globe.js listens there)
+      window.dispatchEvent(new Event('resize'));
+    };
+    btn.addEventListener('click', () =>
+      apply(!box.classList.contains('collapsed')));
+    if (window.matchMedia('(max-width: 640px)').matches) apply(true);
+  }
+  wireCollapse('controls', 'controls-toggle', ['☰', '▴'], 'controls');
+  wireCollapse('vis-options', 'vis-options-toggle', ['⚙', '✕'],
+               'visualisation options');
+
   refreshShellSlider();
   refreshColorbar();
   refreshTimeBar();

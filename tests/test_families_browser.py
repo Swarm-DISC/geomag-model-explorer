@@ -1,16 +1,17 @@
-"""Model families + core SV UI (PLAN v2.9/v2.10/v2.11) against a sandboxed
-server with the `families` flag on (:8222): the "Field to explore" dropdown
-is primary and the "Model" dropdown lenses it, All×CHAOS swaps the date
-picker for the curated diurnal series, layers a family lacks grey out with
-family-aware tooltips, choosing a field a model can't serve greys that model
-out and falls it back, the Core study's B ↔ dB/dt radio drives the core-sv
-field with nT/yr units, and family permalinks round-trip. v2.11 adds the
-Crust (timeless static series) and Magnetosphere (kind-less, day-cache +
-diurnal reuse) studies, single-field families (LCS-1, MMA_SHA_2F seeded
-here; the others are data-driven clones), permanently greyed unevaluated
-entries (MLI_SHA_2E, AMPS), and the ⓘ model-info modal. The flag-off server
-(:8223, same data, studies still on) shows no Model dropdown and degrades
-secular/diurnal series links to v1 (F6).
+"""Model families + core SV UI (PLAN v2.9/v2.10/v2.11/v2.14) against a
+sandboxed server with the `families` flag on (:8228): the "Explore category"
+pills are primary and the "Model" dropdown lenses them, All×CHAOS swaps the
+date picker for the curated diurnal series, layers a family lacks grey out
+with family-aware tooltips, the pills never grey out — choosing a category
+a model can't serve falls the model back and announces it (v2.14) — the
+Core study's B ↔ dB/dt radio drives the core-sv field with nT/yr units, and
+family permalinks round-trip. v2.11 adds the Crust (timeless static series)
+and Magnetosphere (kind-less, day-cache + diurnal reuse) studies,
+single-field families (LCS-1, MMA_SHA_2F seeded here; the others are
+data-driven clones), permanently greyed unevaluated entries (MLI_SHA_2E,
+AMPS), and the ⓘ model-info modal. The flag-off server (:8229, same data,
+studies still on) shows no Model dropdown and degrades secular/diurnal
+series links to v1 (F6).
 
 The sandbox lives in /var/tmp (disk, not the host's 4.9G /tmp tmpfs): the
 seeded tiles — a full day + five series — are ~920 MB."""
@@ -29,8 +30,10 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parent.parent
-PORT_ON = 8222
-PORT_OFF = 8223
+# 8213-8223 are occupied by unrelated fleet services on this host (v2.13
+# finding) — the suite moved to the free range with v2.14
+PORT_ON = 8228
+PORT_OFF = 8229
 SEED_DAY = "2020-01-01"
 ANNUAL_ID = "mio-seasonal-2020"
 SECULAR_ID = "core-secular"
@@ -155,16 +158,16 @@ def test_families_lineup_and_daily_untouched(servers, watched_page):
         "#family-select option", "os => os.map(o => o.value)")
     assert fams == ["ci", "chaos", "lcs1", "mma2f", "mli2e", "amps"]
     assert page.input_value("#family-select") == "ci"
-    # primary "Field to explore" dropdown: stable ids, per-source labels,
+    # primary "Explore category" pills: stable ids, per-source labels,
     # default All ('daily' relabeled All in v2.10; Crust + Magnetosphere
-    # added in v2.11)
+    # added in v2.11; pills since v2.14)
     assert page.eval_on_selector_all(
-        "#field-select option", "os => os.map(o => o.value)") \
+        "#field-pills input", "is => is.map(i => i.value)") \
         == ["daily", "core", "crust", "seasons", "magneto"]
     assert page.eval_on_selector_all(
-        "#field-select option", "os => os.map(o => o.textContent)") \
+        "#field-pills label", "ls => ls.map(l => l.textContent)") \
         == ["All", "Core", "Crust", "Ionosphere", "Magnetosphere"]
-    assert page.input_value("#field-select") == "daily"
+    assert page.is_checked("#field-daily")
     # Daily ≡ v1: date picker, 1440 one-minute ticks, summing checkboxes
     assert page.is_visible("#date-picker")
     assert page.is_hidden("#series-select")
@@ -172,6 +175,10 @@ def test_families_lineup_and_daily_untouched(servers, watched_page):
     assert page.is_hidden("#sv-toggle")
     # the units rule as code: no checkbox exists for the nT/yr field
     assert page.locator("#toggle-core-sv").count() == 0
+    # v2.14 layer labels: row 2 reads "Fields to include" on a summing tab,
+    # and the series/date slot is headed "Visualisation mode"
+    assert page.text_content("#fields-label") == "Fields to include"
+    assert page.text_content("#date-control .ctl-label") == "Visualisation mode"
 
 
 def test_chaos_lens_on_combined(servers, watched_page):
@@ -191,8 +198,9 @@ def test_chaos_lens_on_combined(servers, watched_page):
     assert page.get_attribute("#time-slider", "max") == "1440"
     assert page.text_content("#time-label") == "00:00"
     # CHAOS has no ionospheric layer: the iono toggle greys out, says why
-    # (decision 2026-06-12). The field dropdown stays fully selectable — field
-    # is primary; picking Ionosphere falls the model back (own test below).
+    # (decision 2026-06-12). The category pills stay fully clickable —
+    # category is primary; picking Ionosphere falls the model back (own
+    # test below).
     assert page.is_disabled("#toggle-iono")
     assert "not part of the CHAOS" in _title_of(page, "#toggle-iono")
     # crust and magneto are CHAOS layers — still live
@@ -209,25 +217,30 @@ def test_chaos_lens_on_combined(servers, watched_page):
 
 
 def test_field_switch_falls_model_back(servers, watched_page):
-    """Field is primary: choosing Ionosphere while the model is CHAOS (which
-    has no ionospheric layer) greys CHAOS out and falls the model back to CI.
-    Since the symmetric field grey-out (v2.11) a real user can't click a
-    field the model lacks — select_option drives the option programmatically,
-    exercising the fallback as the permalink/garbage safety net."""
+    """Category is primary: choosing Ionosphere while the model is CHAOS
+    (which has no ionospheric layer) falls the model back to CI and
+    announces it (v2.14) — the pills never grey out, so this is a real
+    click path, not just the permalink/garbage safety net."""
     on, _off = servers
     page, _errors = watched_page
     page.goto(on + "/", timeout=TIMEOUT_MS)
     _wait_ready(page)
     # Core has data in both models — switch to CHAOS there
-    page.select_option("#field-select", "core")
+    page.check("#field-core")
     page.select_option("#family-select", "chaos")
     assert page.evaluate("() => window.geomagModelExplorer.state.family") == "chaos"
-    # now pick Ionosphere: CHAOS can't serve it, so the model falls back to CI
-    page.select_option("#field-select", "seasons")
-    assert page.input_value("#field-select") == "seasons"
+    # now pick Ionosphere: CHAOS can't serve it, so the model falls back to
+    # CI — flagged by the transient status chip naming both families
+    page.check("#field-seasons")
+    assert page.is_checked("#field-seasons")
     assert page.input_value("#family-select") == "ci"
     assert page.evaluate("() => window.geomagModelExplorer.state.family") == "ci"
     assert page.evaluate("() => window.geomagModelExplorer.state.day") == ANNUAL_ID
+    note = page.text_content("#model-switch-note")
+    assert "Swarm CI" in note and "CHAOS has no Ionosphere data" in note
+    # the chip is transient — gone after ~4 s
+    page.wait_for_selector("#model-switch-note", state="detached",
+                           timeout=TIMEOUT_MS)
     # and CHAOS is greyed out in the Model dropdown while Ionosphere is
     # chosen — with the CHAOS-MIO footnote (v2.11: the one model skipped
     # inside an otherwise-covered family)
@@ -244,12 +257,14 @@ def test_core_tab_b_dbdt_toggle(servers, watched_page):
     page, _errors = watched_page
     page.goto(on + "/", timeout=TIMEOUT_MS)
     _wait_ready(page)
-    page.select_option("#field-select", "core")
+    page.check("#field-core")
     assert page.evaluate("() => window.geomagModelExplorer.state.day") == SECULAR_ID
-    # one displayed field at a time: radio replaces the summing checkboxes
+    # one displayed field at a time: radio replaces the summing checkboxes,
+    # and the row label follows the swap (v2.14)
     assert page.is_hidden("#field-toggles")
     assert page.is_visible("#sv-toggle")
     assert page.is_checked("#sv-b")
+    assert page.text_content("#fields-label") == "Field to show"
     assert page.evaluate("() => window.geomagModelExplorer.state.enabled.core")
     # yearly transport: 10 epochs × 10 ticks, dated label
     assert page.get_attribute("#time-slider", "max") == "90"
@@ -277,7 +292,7 @@ def test_core_permalink_roundtrip(servers, watched_page):
     assert state["day"] == SECULAR_ID
     assert state["enabled"]["core-sv"] and not state["enabled"]["core"]
     assert state["shell"] == "cmb"
-    assert page.input_value("#field-select") == "core"
+    assert page.is_checked("#field-core")
     assert page.is_checked("#sv-dbdt")
     assert "nT/yr" in page.text_content("#colorbar-max")
     # write-back keeps the series keys; ci is encoded as *no* family key
@@ -314,7 +329,7 @@ def test_lens_only_permalink_lands_on_family_default(servers, watched_page):
     _wait_ready(page)
     assert page.evaluate("() => window.geomagModelExplorer.state.family") == "chaos"
     assert page.evaluate("() => window.geomagModelExplorer.state.day") == CHAOS_DAY_ID
-    assert page.input_value("#field-select") == "daily"
+    assert page.is_checked("#field-daily")
 
 
 def test_garbage_family_ignored(servers, watched_page):
@@ -354,8 +369,8 @@ def test_unevaluated_models_stay_disabled(servers, watched_page):
         sel = f"#family-select option[value={fam}]"
         assert page.eval_on_selector(sel, "o => o.disabled") is True
         assert needle in page.eval_on_selector(sel, "o => o.title")
-    # they survive every refresh: switch fields and re-check
-    page.select_option("#field-select", "crust")
+    # they survive every refresh: switch categories and re-check
+    page.check("#field-crust")
     assert page.eval_on_selector(
         "#family-select option[value=amps]", "o => o.disabled") is True
 
@@ -365,7 +380,7 @@ def test_crust_study_is_timeless(servers, watched_page):
     page, _errors = watched_page
     page.goto(on + "/", timeout=TIMEOUT_MS)
     _wait_ready(page)
-    page.select_option("#field-select", "crust")
+    page.check("#field-crust")
     assert page.evaluate(
         "() => window.geomagModelExplorer.state.day") == CRUST_CI_ID
     # single-epoch series: no time axis — the transport hides entirely
@@ -383,7 +398,7 @@ def test_crust_study_is_timeless(servers, watched_page):
         f".series['{CRUST_LCS1_ID}'].qrange_nT.crust") == 2000.0
     assert page.is_hidden("#timebar")
     # leaving the crust study restores the transport
-    page.select_option("#field-select", "daily")
+    page.check("#field-daily")
     assert page.is_visible("#timebar")
 
 
@@ -392,7 +407,7 @@ def test_magneto_study_reuses_day_and_diurnals(servers, watched_page):
     page, _errors = watched_page
     page.goto(on + "/", timeout=TIMEOUT_MS)
     _wait_ready(page)
-    page.select_option("#field-select", "magneto")
+    page.check("#field-magneto")
     # CI rides the day cache, pinned like All — full 15-min transport
     assert page.evaluate(
         "() => window.geomagModelExplorer.state.day") == SEED_DAY
@@ -416,11 +431,13 @@ def test_magneto_study_reuses_day_and_diurnals(servers, watched_page):
         "#family-select option[value=lcs1]", "o => o.disabled") is True
 
 
-def test_field_options_grey_per_model(servers, watched_page):
-    """Symmetric grey-out (user report 2026-07-03): a field the chosen model
-    cannot serve must not be selectable — it previously stayed live and
-    picking it silently swapped the model back to one that had it (All ×
-    MMA_SHA_2F offered Crust, which landed on Swarm CI)."""
+def test_category_pills_never_disabled(servers, watched_page):
+    """v2.14 inverts the v2.11 symmetric grey-out (user decision
+    2026-07-15): the category is the top-level choice and must always be
+    actionable. A pill the chosen model can't serve stays clickable —
+    clicking it falls the model back to the first family that serves it
+    (Swarm CI serves everything and sorts first) and announces the switch;
+    the Model select stays the honest, greyed side."""
     on, _off = servers
     page, _errors = watched_page
     page.goto(on + "/", timeout=TIMEOUT_MS)
@@ -428,22 +445,27 @@ def test_field_options_grey_per_model(servers, watched_page):
     page.select_option("#family-select", "mma2f")
     assert page.evaluate(
         "() => window.geomagModelExplorer.state.family") == "mma2f"
-    disabled = dict(page.eval_on_selector_all(
-        "#field-select option", "os => os.map(o => [o.value, o.disabled])"))
-    assert disabled == {"daily": False, "core": True, "crust": True,
-                        "seasons": True, "magneto": False}
+    # no pill is ever disabled, whatever the model
+    assert page.eval_on_selector_all(
+        "#field-pills input", "is => is.some(i => i.disabled)") is False
+    # clicking Crust under MMA_SHA_2F auto-switches the model to Swarm CI
+    page.check("#field-crust")
+    assert page.evaluate(
+        "() => window.geomagModelExplorer.state.family") == "ci"
+    assert page.input_value("#family-select") == "ci"
+    assert page.evaluate(
+        "() => window.geomagModelExplorer.state.day") == CRUST_CI_ID
+    note = page.text_content("#model-switch-note")
+    assert "Swarm CI" in note and "MMA_SHA_2F has no Crust data" in note
+    # the Model select still greys honestly: MMA_SHA_2F has no crust series
+    assert page.eval_on_selector(
+        "#family-select option[value=mma2f]", "o => o.disabled") is True
     assert "no Crust data in the MMA_SHA_2F model series" == \
-        page.eval_on_selector("#field-select option[value=crust]",
+        page.eval_on_selector("#family-select option[value=mma2f]",
                               "o => o.title")
-    # back to Swarm CI: every study reopens
-    page.select_option("#family-select", "ci")
-    disabled = dict(page.eval_on_selector_all(
-        "#field-select option", "os => os.map(o => [o.value, o.disabled])"))
-    assert set(disabled.values()) == {False}
-    # the CHAOS-MIO footnote rides the field-side tooltip too
-    page.select_option("#family-select", "chaos")
-    assert "CHAOS-MIO" in page.eval_on_selector(
-        "#field-select option[value=seasons]", "o => o.title")
+    # pills still all enabled after the refresh
+    assert page.eval_on_selector_all(
+        "#field-pills input", "is => is.some(i => i.disabled)") is False
 
 
 def test_magneto_tab_permalink_roundtrip(servers, watched_page):
@@ -453,14 +475,14 @@ def test_magneto_tab_permalink_roundtrip(servers, watched_page):
     page, _errors = watched_page
     page.goto(on + "/", timeout=TIMEOUT_MS)
     _wait_ready(page)
-    page.select_option("#field-select", "magneto")
+    page.check("#field-magneto")
     page.wait_for_function(
         "() => location.hash.includes('tab=magneto')", timeout=TIMEOUT_MS)
     href = page.evaluate("() => location.href")
     page.goto("about:blank")
     page.goto(href, timeout=TIMEOUT_MS)
     _wait_ready(page)
-    assert page.input_value("#field-select") == "magneto"
+    assert page.is_checked("#field-magneto")
     assert page.evaluate(
         "() => window.geomagModelExplorer.state.enabled.magneto")
 
@@ -476,12 +498,21 @@ def test_model_info_modal(servers, watched_page):
     text = page.text_content("#model-info")
     assert "Swarm CI" in text
     assert "MCO_SHA_2C" in text                    # day-cache core model
-    assert "max_degree=18" in text                 # expression (manifest v4)
     assert "CHAOS-MIO" in text and "AMPS" in text  # unevaluated footer
+    # the exact VirES expression rides a dedicated code row (v2.14),
+    # verbatim from manifest.models, with the docs link beneath
+    exprs = page.eval_on_selector_all(
+        "#model-info .mi-expr code", "cs => cs.map(c => c.textContent)")
+    assert any("max_degree=18" in e for e in exprs)
+    assert page.eval_on_selector("#model-info .mi-docs a", "a => a.href") \
+        == ("https://viresclient.readthedocs.io/en/latest/"
+            "available_parameters.html#models")
+    # 127.0.0.1 is a secure context: the copy affordance is present
+    assert page.locator("#model-info .mi-copy").count() > 0
     page.keyboard.press("Escape")                  # native <dialog> Esc
     assert page.eval_on_selector("#model-info", "d => d.open") is False
     # per-family content swap: the LCS-1 crust study
-    page.select_option("#field-select", "crust")
+    page.check("#field-crust")
     page.select_option("#family-select", "lcs1")
     page.click("#model-info-btn")
     text = page.text_content("#model-info")
@@ -500,13 +531,13 @@ def test_flag_off_has_no_family_controls(servers, watched_page):
     assert page.locator("#family-select").count() == 0
     assert page.locator("#sv-toggle").count() == 0
     assert page.locator("#model-info-btn").count() == 0  # modelinfo off too
-    # no Core study and no per-source labels in the v1 lineup; the field
-    # dropdown shows exactly the two v1 studies
+    # no Core study and no per-source labels in the v1 lineup; the category
+    # pills show exactly the two v1 studies
     assert page.eval_on_selector_all(
-        "#field-select option", "os => os.map(o => o.value)") \
+        "#field-pills input", "is => is.map(i => i.value)") \
         == ["daily", "seasons"]
     assert page.eval_on_selector_all(
-        "#field-select option", "os => os.map(o => o.textContent)") \
+        "#field-pills label", "ls => ls.map(l => l.textContent)") \
         == ["Daily", "Ionosphere (Seasonal)"]
 
 
@@ -520,6 +551,9 @@ def test_flag_off_degrades_gated_series_links(servers, watched_page, sid):
     _wait_ready(page)
     state = page.evaluate("() => window.geomagModelExplorer.state")
     assert state["day"] == SEED_DAY
-    assert state["pos"] == 0
-    assert page.input_value("#field-select") == "daily"
+    # the refused link leaves the boot default in charge — pos 32 (08:00 UT)
+    # since the v2.12 landing-view tune (stale expectation, latent while the
+    # old port made the suite unrunnable; same family as 95eda4c)
+    assert state["pos"] == 32
+    assert page.is_checked("#field-daily")
     assert page.get_attribute("#time-slider", "max") == "1440"
