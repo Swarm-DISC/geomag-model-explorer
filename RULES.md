@@ -42,3 +42,13 @@ starter `RULES.md`). Where they overlap, this file wins for project specifics.
 9. **License.** The project is MIT-licensed: a real `LICENSE` file at the root
    (copyright Swarm DISC), matched and enforced by the gate
    (`[gate] require_license = true`, `license = "MIT"` in `.heimdall.toml`).
+10. **One branch, one worktree — this checkout parks on `main`.** This directory is
+    shared by every agent and served by :8212, so parked on `main` it always serves
+    the published state — never `git switch` it. Claim a branch with
+    `heimdall worktree add geomag-model-explorer <branch>` (cut from freshly-fetched
+    `internal/main` by default; `--from <base>` otherwise) and work in that worktree:
+    run `uv sync` first (per-worktree `.venv`); `data/raw` and `web/data` there are
+    symlinks to this checkout's data — shared, read-mostly; never run
+    `fetch.py`/`export.py` from a worktree (replace the symlink with a real dir if a
+    branch must regenerate data). Push, preview on :8300, browser-test (rule 5),
+    merge to `main` here, then `heimdall worktree rm geomag-model-explorer <branch>`.

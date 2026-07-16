@@ -29,6 +29,11 @@ Read these first, in order:
   `deploy/`). Note the service serves its **own data dir** (`GEOMAG_MODEL_EXPLORER_DATA`)
   — browser-verify branch work against the branch's Heimdall **:8300 preview** (which
   mounts the checkout's `web/data`), not :8212.
+- **Branch work:** this checkout stays **parked on `main`** (rule 10) — never
+  `git switch` it. Claim a branch with `heimdall worktree add geomag-model-explorer
+  <branch>` and work in that worktree (prefer this over generic worktree tooling —
+  it encodes the fleet conventions: fresh-`internal/main` base, data symlinks, the
+  one-branch-one-worktree claim). Run `uv sync` in the worktree first.
 - **Environments:** `uv` project. `uv sync` for dev; `uv sync --extra fetch` only
   when running `fetch.py` (viresclient). Tests: `uv run pytest`.
 - **Headless browser:** Playwright + Chromium cached workspace-wide. WebGL2 +

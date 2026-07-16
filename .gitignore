@@ -5,6 +5,8 @@ __pycache__/
 node_modules/
 
 # fetched + exported data (reproducible via fetch.py + export.py;
-# provenance lives in data/MANIFEST.toml, which IS committed)
-data/raw/
-web/data/
+# provenance lives in data/MANIFEST.toml, which IS committed).
+# No trailing slash: in agent worktrees these are symlinks to the primary
+# checkout's dirs, and a dir-only pattern would not match them.
+data/raw
+web/data

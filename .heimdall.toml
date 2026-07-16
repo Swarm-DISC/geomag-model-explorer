@@ -36,6 +36,13 @@ license = "MIT"                 # …and matches this SPDX id (Heimdall imposes 
 data_mounts = { "web/data" = "/data/web/data", "data" = "/data/data" }
 env = { GEOMAG_MODEL_EXPLORER_SKIP_FETCH = "1" }
 
+[worktree]                      # per-agent branch worktrees (heimdall worktree add …)
+# Symlinked from the primary checkout — the same gigabytes the preview mounts read-only.
+# Shared and read-mostly: never run fetch.py / export.py from inside a worktree.
+# (Only fully-gitignored paths: data/MANIFEST.toml + data/validity.json stay tracked per-branch.)
+link_dirs = ["data/raw", "web/data"]
+setup = "uv sync"               # each worktree gets its own .venv (uv hardlinks from its cache)
+
 [deploy]                        # emit-only deployment-setup registration
 target = "deployment-setup/experimental"
 name = "geomag-model-explorer"
