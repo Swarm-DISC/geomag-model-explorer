@@ -323,6 +323,17 @@ def test_lru_neutral_and_cancel(servers, watched_page):
     page.goto(on)
     _wait_ready(page)
     page.check("#view-series")
+    # the idle neighbor-shell prefetch (main.js) lands ~1 s after the boot
+    # commit — wait for the cache to reach its resting population (two equal
+    # samples 1.5 s apart) so it cannot pollute the neutrality measurement
+    page.wait_for_function(
+        """() => {
+          const n = window.geomagModelExplorer.cacheSize();
+          const stable = window.__lruProbe === n;
+          window.__lruProbe = n;
+          return stable;
+        }""",
+        polling=1500, timeout=TIMEOUT_MS)
     before = page.evaluate("window.geomagModelExplorer.cacheSize()")
     _pin(page)
     _wait_charts(page)

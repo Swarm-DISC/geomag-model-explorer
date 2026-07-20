@@ -64,6 +64,12 @@
     <span id="shell-label"></span>
   </div>
   <div id="readout" hidden></div>
+  <!-- tile-loading overlay: visible by default so it covers the boot fetch
+       before main.js runs; the first applyTextures commit hides it -->
+  <div id="load-overlay" role="status">
+    <div id="load-spinner" aria-hidden="true"></div>
+    <span id="load-overlay-text">Loading field data…</span>
+  </div>
   <div id="colorbar">
     <span id="colorbar-max"></span>
     <div id="colorbar-ramp-wrap"><div id="colorbar-ramp"></div></div>

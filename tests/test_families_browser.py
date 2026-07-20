@@ -279,8 +279,14 @@ def test_core_tab_b_dbdt_toggle(servers, watched_page):
     assert page.evaluate("() => window.geomagModelExplorer.state.vmaxLock") is None
     assert page.evaluate("() => window.geomagModelExplorer.state.enabled['core-sv']")
     assert not page.evaluate("() => window.geomagModelExplorer.state.enabled.core")
+    # the colorbar relabels on the texture commit, not on the click — until
+    # the dB/dt tiles bind it still (correctly) describes the shown B field
+    page.wait_for_function(
+        "() => !window.geomagModelExplorer.pending()", timeout=TIMEOUT_MS)
     assert "nT/yr" in page.text_content("#colorbar-max")
     page.click("#sv-b")
+    page.wait_for_function(
+        "() => !window.geomagModelExplorer.pending()", timeout=TIMEOUT_MS)
     assert "nT/yr" not in page.text_content("#colorbar-max")
 
 

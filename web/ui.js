@@ -73,7 +73,6 @@ export function initUI(state, manifest, hooks, timeline) {
     cb.addEventListener('change', () => {
       state.enabled[field] = cb.checked;
       refreshShellSlider();
-      refreshColorbar();
       hooks.applyTextures();
     });
     label.append(cb, document.createTextNode(FIELD_LABELS[field]));
@@ -142,12 +141,15 @@ export function initUI(state, manifest, hooks, timeline) {
     });
   }
 
+  // The mesh follows the drag instantly; the colorbar does NOT relabel here —
+  // applyTextures relabels it when the new shell's tiles actually bind, so
+  // the numbers never describe data that is not on screen yet (the shader
+  // dims the stale tiles for the same reason).
   shellSlider.addEventListener('input', () => {
     const [slug, radiusM] = shellRadii[Number(shellSlider.value)];
     state.shell = slug;
     shellLabelEl.textContent = shellLabel(slug, radiusM);
     refreshToggles();
-    refreshColorbar();
     hooks.setShell(radiusM / R_SURFACE_M);
     scheduleScrubApply();
   });
@@ -167,7 +169,6 @@ export function initUI(state, manifest, hooks, timeline) {
     state.day = day;
     dateEl.value = day;
     refreshToggles();
-    refreshColorbar();
     hooks.applyTextures();
   }
 
@@ -178,6 +179,42 @@ export function initUI(state, manifest, hooks, timeline) {
     chipEl.classList.toggle('error', isError);
   }
   function hideFetchChip() { chipEl.hidden = true; }
+
+  // --- tile-loading overlay (centered on the globe) -------------------------
+  // applyTextures (main.js) drives this around its fetch gap. The grace
+  // delay keeps fast loads from flashing the spinner; the markup ships
+  // visible so it also covers the boot fetch before any JS runs.
+  const overlayEl = $('load-overlay');
+  const overlayTextEl = $('load-overlay-text');
+  let overlayTimer = null;
+  function showLoadOverlaySoon(delayMs = 200) {
+    if (overlayEl.classList.contains('error')) {
+      // a retry / view change is underway — flip back to loading right away
+      overlayEl.classList.remove('error');
+      overlayTextEl.textContent = 'Loading field data…';
+      return;
+    }
+    if (!overlayEl.hidden || overlayTimer) return;  // shown or already queued
+    overlayTimer = setTimeout(() => {
+      overlayTimer = null;
+      overlayTextEl.textContent = 'Loading field data…';
+      overlayEl.hidden = false;
+    }, delayMs);
+  }
+  function hideLoadOverlay() {
+    if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
+    overlayEl.classList.remove('error');
+    overlayEl.hidden = true;
+  }
+  function showLoadOverlayError(text) {
+    if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
+    overlayTextEl.textContent = text;
+    overlayEl.classList.add('error');
+    overlayEl.hidden = false;
+  }
+  overlayEl.addEventListener('click', () => {
+    if (overlayEl.classList.contains('error')) hooks.applyTextures();
+  });
 
   // --- bottom time bar --------------------------------------------------------
   // The slider runs in ticks of the active timeline (state.pos × subdiv), so
@@ -228,7 +265,6 @@ export function initUI(state, manifest, hooks, timeline) {
   lockBtn.addEventListener('click', () => {
     state.vmaxLock = state.vmaxLock == null ? hooks.displayVmax() : null;
     refreshLockBtn();
-    refreshColorbar();
     hooks.applyTextures();
   });
   refreshLockBtn();
@@ -263,5 +299,6 @@ export function initUI(state, manifest, hooks, timeline) {
   onTimeAdvance();
 
   return { onTimeAdvance, setDay, refreshToggles, refreshShellSlider,
-           refreshColorbar, refreshTimeBar, showFetchChip, hideFetchChip };
+           refreshColorbar, refreshTimeBar, showFetchChip, hideFetchChip,
+           showLoadOverlaySoon, hideLoadOverlay, showLoadOverlayError };
 }

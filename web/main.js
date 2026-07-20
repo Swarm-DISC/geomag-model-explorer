@@ -5,7 +5,8 @@ import { loadManifest, getTexture, getTextureSync, setDecodeHook, prefetch,
          storageGrid, tileURL, abortStaleFetches } from './dataset.js';
 import { createGlobe } from './globe.js';
 import { FIELD_INDEX } from './shaders.js';
-import { initUI, fmtTime, COMPONENT_LABELS, R_SURFACE_M } from './ui.js';
+import { initUI, fmtTime, shellUnion, COMPONENT_LABELS, R_SURFACE_M }
+  from './ui.js';
 
 const state = {
   // v2.12 defaults: the full four-field sum, lit and displaced — the landing
@@ -204,51 +205,128 @@ async function main() {
   // uMix may only track the clock while the bound pair matches it.
   let boundStep = -1;
 
+  // Loading-states generations: applySeq stamps each applyTextures call,
+  // boundSeq the one whose tiles are on screen. While they differ the
+  // display is stale — the shell dims (uStale) and the overlay shows after
+  // a grace delay. A call that finds a newer seq after its await never
+  // commits; before this gate a scrubbed-over call (its AbortError was
+  // swallowed per pair) could still land its uniforms out of order.
+  let applySeq = 0;
+  let boundSeq = 0;
+  let neighborTimer = null;
+
   // Set the floor/ceil timestep textures for every enabled field at the
-  // current shell; disables fields without data there. scrub: true (slider
-  // drags) additionally aborts in-flight tile fetches this call supersedes —
-  // a drag fires per input event and only the newest request set matters.
+  // current shell; disables fields without data there. All uniform writes —
+  // enables, descale ranges, textures, vmax — plus the colorbar relabel
+  // happen in one atomic commit after every tile has arrived: writing any
+  // of them earlier renormalizes the still-bound old tiles by the new
+  // view's ranges (the misleading slow-link display this replaces).
+  // scrub: true (slider drags) additionally aborts in-flight tile fetches
+  // this call supersedes — a drag fires per input event and only the
+  // newest request set matters.
   async function applyTextures({ scrub = false } = {}) {
+    const seq = ++applySeq;
+    if (neighborTimer) { clearTimeout(neighborTimer); neighborTimer = null; }
     const step = state.pos;
+    const plan = [];                   // [i, on, qrange, grid] per field
     const loads = [];
     const wanted = new Set();
+    let cached = true;
     for (const field of Object.keys(manifest.fields)) {
       const i = FIELD_INDEX[field];
       if (i === undefined) continue;
       const src = frameSource(state, field);
       const on = state.enabled[field] && src &&
         src.shells.includes(state.shell);
-      u.uEnable.value[i] = on ? 1 : 0;
       // the active series may store this field at a different range (v2.9)
       // or grid (v2.13 — quarterly seculars at 2°) than the field default —
       // descale and texel math must follow the tiles
-      u.uScale.value[i] = storageQrange(field, state.day, state.shell);
-      const g = storageGrid(field, state.day);
-      u.uGrid.value[i].set(g[0], g[1], 1 / g[0], 1 / g[1]);
+      plan.push([i, on, storageQrange(field, state.day, state.shell),
+                 storageGrid(field, state.day)]);
       if (!on) continue;
       const a = src.stepped ? Math.min(Math.floor(step), src.n - 2) : 0;
       const b = src.stepped ? a + 1 : 0;
       wanted.add(tileURL(field, state.shell, state.day, a));
       wanted.add(tileURL(field, state.shell, state.day, b));
+      if (!getTextureSync(field, state.shell, state.day, a) ||
+          !getTextureSync(field, state.shell, state.day, b)) cached = false;
       loads.push(Promise.all([
         getTexture(field, state.shell, state.day, a),
         getTexture(field, state.shell, state.day, b),
-      ]).then(([ta, tb]) => {
-        u[`uTexA${i}`].value = ta.tex;
-        u[`uTexB${i}`].value = tb.tex;
-      }).catch((err) => {
-        // a newer scrub event aborted this pair — it is superseded, not broken
-        if (err?.name !== 'AbortError') throw err;
-      }));
+      ]).then(([ta, tb]) => [i, ta.tex, tb.tex]));
     }
     if (scrub) abortStaleFetches(wanted);
+    if (!cached) {                     // a real wait ahead: mark the display
+      u.uStale.value = 1;              // stale and queue the overlay
+      state.dirty = true;
+      ui.showLoadOverlaySoon();
+    }
+    let binds;
+    try {
+      binds = await Promise.all(loads);
+    } catch (err) {
+      // An AbortError proves a newer call exists (abortStaleFetches only
+      // kills URLs the newest set no longer wants) — that call owns the
+      // pending UI. A real failure keeps the honest stale dim and turns
+      // the overlay into a retry affordance (failed fetches drop out of
+      // the tile cache, so the next applyTextures refetches for real).
+      if (seq === applySeq && err?.name !== 'AbortError') {
+        console.warn('tile load failed:', err);
+        ui.showLoadOverlayError(
+          'Field data failed to load — click or change view to retry');
+      }
+      return;
+    }
+    if (seq !== applySeq) return;      // superseded while awaiting: no commit
+    for (const [i, on, qrange, g] of plan) {
+      u.uEnable.value[i] = on ? 1 : 0;
+      u.uScale.value[i] = qrange;
+      u.uGrid.value[i].set(g[0], g[1], 1 / g[0], 1 / g[1]);
+    }
+    for (const [i, ta, tb] of binds) {
+      u[`uTexA${i}`].value = ta;
+      u[`uTexB${i}`].value = tb;
+    }
     u.uVmax.value = displayVmax();
     applyComponent();
-    await Promise.all(loads);
     const stepFloor = Math.min(Math.floor(step), timeline.nEpochs - 2);
     boundStep = stepFloor;
     u.uMix.value = Math.max(0, Math.min(1, step - stepFloor));
+    boundSeq = seq;
+    u.uStale.value = 0;
+    ui.hideLoadOverlay();
+    ui.refreshColorbar();              // deferred relabel: numbers follow data
     state.dirty = true;
+    neighborTimer = setTimeout(prefetchNeighborShells, 1000);
+  }
+
+  // Idle neighbor prefetch: once the view settles, warm the ±2 adjacent
+  // rungs of the slider's shell ladder for the enabled fields so slow-link
+  // scrubs mostly hit cache (~24 tiles worst case, well inside the LRU
+  // budget). Foreground work owns the network: every applyTextures call
+  // clears the timer, and a scrub's abortStaleFetches kills in-flight warms.
+  function prefetchNeighborShells() {
+    neighborTimer = null;
+    if (state.playing || applySeq !== boundSeq) return;
+    const ladder = shellUnion(state, manifest, hooks);
+    const at = ladder.findIndex(([slug]) => slug === state.shell);
+    if (at < 0) return;
+    for (const off of [-1, 1, -2, 2]) {
+      const [slug] = ladder[at + off] ?? [];
+      if (!slug) continue;
+      for (const field of Object.keys(manifest.fields)) {
+        if (FIELD_INDEX[field] === undefined) continue;
+        const src = frameSource(state, field);
+        if (!state.enabled[field] || !src || !src.shells.includes(slug)) {
+          continue;
+        }
+        const a = src.stepped ? Math.min(Math.floor(state.pos), src.n - 2) : 0;
+        getTexture(field, slug, state.day, a).catch(() => {});
+        if (src.stepped) {
+          getTexture(field, slug, state.day, a + 1).catch(() => {});
+        }
+      }
+    }
   }
 
   // Per-frame playback advance, fully synchronous: swap to the new floor/ceil
@@ -479,6 +557,8 @@ async function main() {
     cacheSize,
     // what the shader is actually showing, in timestep units (0..96)
     timePos: () => boundStep + u.uMix.value,
+    // true while an applyTextures target has not committed (stale display)
+    pending: () => applySeq !== boundSeq,
     renderOnce: () => globe.render(),
     readPixel: (x, y) => {
       const c = document.createElement('canvas');
@@ -492,6 +572,9 @@ async function main() {
 
 main().catch((err) => {
   console.error(err);
+  // the boot overlay ships visible — never leave it over the error report
+  const overlay = document.getElementById('load-overlay');
+  if (overlay) overlay.hidden = true;
   const el = document.getElementById('error');
   if (el) { el.textContent = String(err); el.hidden = false; }
 });

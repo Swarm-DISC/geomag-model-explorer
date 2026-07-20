@@ -221,7 +221,10 @@ def test_playback_advances_frames(app_page):
     page.click("#play-btn")   # pause
     assert len(hashes) >= 4, f"only {len(hashes)} distinct frames in playback"
     assert page.evaluate("() => window.geomagModelExplorer.state.pos") > 0
-    assert page.evaluate("() => window.geomagModelExplorer.cacheSize()") <= 64
+    # bounded by the 128 MB byte budget (dataset.js), not an entry count:
+    # ~245 core-grid tiles is the worst legal population; playback plus the
+    # idle neighbor-shell prefetch must stay inside it
+    assert page.evaluate("() => window.geomagModelExplorer.cacheSize()") <= 245
 
 
 def test_playback_is_smooth(app_page):

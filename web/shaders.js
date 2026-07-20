@@ -102,6 +102,7 @@ uniform float uOpacity;
 uniform vec3 uLightDir;        // view-space; headlight unless the sun drives it
 uniform vec3 uSunDir;          // unit subsolar direction, object space (= ECEF)
 uniform float uSunlight;       // 1 while the Sunlight toggle is on (v2.12)
+uniform float uStale;          // 1 while the bound tiles lag the target view
 
 void main() {
   vec2 ll = lonlat(vPos);
@@ -126,6 +127,14 @@ void main() {
     // unlit side stays readable when the sun (not the headlight) is the light.
     vec3 nrm = normalize(cross(dFdx(vViewPos), dFdy(vViewPos)));
     col *= 0.55 + 0.45 * clamp(dot(nrm, normalize(uLightDir)), 0.0, 1.0);
+  }
+  if (uStale != 0.0) {
+    // The bound tiles belong to a superseded shell/day/step: desaturate and
+    // darken so the lag reads as "loading", not as the new view's values
+    // (applyTextures clears this on commit). Last color op so the dim wins
+    // over sun/relief shading. uStale == 0 — bit-identical off path.
+    float g = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(col, vec3(g * 0.55), 0.65 * uStale);
   }
   fragColor = vec4(col, uOpacity);
 }
@@ -172,6 +181,7 @@ export function buildFieldMaterial(lut, coast) {
     uLightDir: { value: new THREE.Vector3(0.35, 0.45, 0.85).normalize() },
     uSunDir: { value: new THREE.Vector3(0, 0, 1) },
     uSunlight: { value: 0 },
+    uStale: { value: 0 },
     uLut: { value: lut },
     uCoast: { value: coast },
     uCoastMix: { value: 1 },

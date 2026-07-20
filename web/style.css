@@ -388,6 +388,57 @@ fieldset {
   overflow: hidden;
 }
 
+/* ---- tile-loading overlay: centered spinner over the globe while
+   applyTextures waits on tiles (ui.js shows it after a grace delay, the
+   commit in main.js hides it); .error turns it into a retry affordance ---- */
+#load-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  pointer-events: none;
+}
+
+/* the hidden attribute must beat the flex rule above (UA sheet loses) */
+#load-overlay[hidden] {
+  display: none;
+}
+
+#load-spinner {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  border: 3px solid rgba(205, 214, 234, 0.25);
+  border-top-color: var(--accent);
+  animation: load-spin 0.9s linear infinite;
+}
+
+@keyframes load-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #load-spinner { animation: none; }
+}
+
+#load-overlay span {
+  background: #233055;
+  border-radius: 999px;
+  padding: 0.15rem 0.8rem;
+  font-size: 0.85em;
+}
+
+#load-overlay.error {
+  pointer-events: auto;
+  cursor: pointer;
+}
+#load-overlay.error #load-spinner { display: none; }
+#load-overlay.error span { background: #5b1a1a; color: #ffd7d7; }
+
 #globe canvas { display: block; }
 
 /* colorbar: vertical overlay on the globe's right edge, mirroring #shell-control */

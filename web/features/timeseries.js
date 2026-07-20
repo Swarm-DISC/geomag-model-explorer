@@ -377,7 +377,6 @@ export function attach({ state, manifest, globe, ui, hooks, timeline,
     if (slug !== state.shell) {
       state.shell = slug;
       ui.refreshShellSlider();
-      ui.refreshColorbar();
       hooks.setShell(snappedM / R_SURFACE_M);
       hooks.applyTextures();
     }

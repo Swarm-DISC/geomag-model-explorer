@@ -150,9 +150,9 @@ Carried forward — still open, not yet decisions:
 
 ## 3. Next phases
 
-Two phases are recorded below: v2.13 (this branch — awaiting merge, which
-publishes) and v2.14 (merged to `main` 2026-07-16; this branch now builds on
-it). [`IDEAS.md`](./IDEAS.md) is the candidate backlog; items are promoted
+Three phases are recorded below: v2.13 and v2.14 (both merged to `main`),
+and v2.15 (branch `loading-states`).
+[`IDEAS.md`](./IDEAS.md) is the candidate backlog; items are promoted
 into numbered phases here only on human approval, with the decision date
 recorded.
 
@@ -161,7 +161,7 @@ recorded.
 **Approved 2026-07-15** (direct user request, so the RULES §8 human-review
 gate is satisfied by construction; the nearest prior thinking was IDEAS §4.5's
 pinned-probe sparkline). Branch: `timeline-viewer` — **implemented and
-browser-verified 2026-07-15**, awaiting merge (which publishes).
+browser-verified 2026-07-15**, since merged to `main`.
 
 **Why.** The globe answers *where*; nothing answers *when* at a fixed place.
 A pinned point plus three stacked component charts over the active timeline
@@ -475,6 +475,56 @@ reflowing, a 390×844 page boots collapsed on a full centred disc
 (`live_v214_mobile.png`), 700×500 overlay geometry stays clear. Known
 cosmetic limit: the *expanded* vis box on a phone overlays the shell
 panel — it is a dismissible translucent overlay, accepted for now.
+
+### Phase v2.15 — Loading states (slow-connection honesty)
+
+**Approved 2026-07-17** (direct user request: the site misleads on slow
+connections — the shell mesh moved and the colorbar relabeled while the old
+shell's values stayed painted until the tiles arrived). Branch:
+`loading-states` — implemented and browser-verified 2026-07-17.
+
+**Why.** `applyTextures` wrote its uniforms (enables, per-shell qrange
+descale, `uVmax`) *before* awaiting the tile fetch, so during the gap the
+still-bound old tiles were renormalized by the new view's ranges under an
+already-relabeled colorbar; a scrubbed-over call could also commit late (its
+per-pair AbortError was swallowed, so the superseded `Promise.all` still
+resolved). Playback already had the right discipline (freeze until decoded);
+the shell/mode/day paths never adopted it. There was no tile-loading
+indicator at all.
+
+**Shape.** A pending/target contract in `main.js`: `applySeq` stamps each
+`applyTextures` call, `boundSeq` the one on screen; while they differ the
+shell dims (`uStale` desaturate in `shaders.js`, bit-identical off path) and
+a centered globe overlay (`#load-overlay`, CSS-only spinner, 200 ms grace
+delay against flicker; ships visible so it also covers boot) shows until the
+**atomic commit**: all uniform writes, texture binds, `uVmax`, and the
+colorbar relabel land together after every tile resolves — the four
+interaction-time `refreshColorbar()` calls (and the studies/timeseries ones)
+are gone. The mesh still follows the slider live (deliberate: responsive
+geometry, honestly-dimmed values). Superseded calls never commit; a real
+fetch failure keeps the stale dim and turns the overlay into a
+click-to-retry (failed tiles self-evict from the cache, so the retry is
+real). After each commit an idle timer (1 s) prefetches the ±2 neighbor
+rungs of the shell ladder for the enabled fields (~24 tiles worst case,
+inside the 128 MB LRU; skipped while playing; a scrub's `abortStaleFetches`
+cancels in-flight warms). Deliberate behavior change: binding is atomic —
+fields no longer pop in one-by-one on mode switches.
+
+**Contract & invariants.**
+- The colorbar and the shader uniforms only ever describe tiles that are
+  actually bound; between target and commit the display is visibly stale
+  (dim + overlay), never silently wrong.
+- Playback never enters pending — `advancePlayback` keeps its own
+  freeze-until-decoded discipline untouched.
+- Fully-cached scrubs skip the pending UI entirely (no dim/overlay flash).
+- Test handle: `pending()` on `window.geomagModelExplorer`.
+- Verified by `tests/test_loading_browser.py` (sandboxed :8239, page-side
+  tile latency/failure shim): boot overlay, throttled-scrub dim + deferred
+  relabel, cached-scrub no-flash, mode-switch pending, playback never
+  pends, failure → retry, idle prefetch warms neighbors. Two existing
+  assertions updated for the new behavior (families unit relabel now waits
+  for commit; timeseries LRU-neutrality measures after the prefetch
+  settles; live-suite cache bound restated against the byte budget).
 
 On the slate (IDEAS-only, not approved): Storms tab + indices (the `window`
 series kind, `fetch.py --indices` + strip chart, curated storm window

@@ -515,7 +515,6 @@ export function attach({ state, manifest, ui, hooks, timeline, features }) {
       .map((spec) => spec.shells[state.shell])
       .find((r) => r !== undefined);
     if (radiusM !== undefined) hooks.setShell(radiusM / R_SURFACE_M);
-    ui.refreshColorbar();
     ui.refreshTimeBar();
     ui.onTimeAdvance();
     hooks.applyTextures();
