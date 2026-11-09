@@ -1,39 +1,24 @@
-"""Permalink feature (PLAN v2.1) against a sandboxed server (:8232) with the
+"""Permalink feature (PLAN v2.1) against a sandboxed server with the
 flag on: a hash restores state + camera before the UI builds, interactions
-write the hash back, garbage degrades to defaults, and flag-off (:8233, same
+write the hash back, garbage degrades to defaults, and flag-off (same
 data) is byte-for-byte v1 behavior."""
 from __future__ import annotations
 
 import json
 import os
 import shutil
-import socket
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
+from _sandbox import free_ports, wait_port
 
 REPO = Path(__file__).resolve().parent.parent
-# 8213-8223 are occupied by unrelated fleet services on this host (v2.13
-# finding) — the suite moved to the free range with v2.14
-PORT_ON = 8232
-PORT_OFF = 8233
 SEED_DAY = "2020-01-01"
 TIMEOUT_MS = 120_000
 
 DEMO_HASH = f"#day={SEED_DAY}&t=06:00&f=core&c=N&s=cmb&cam=0.000,0.000,2.500"
-
-
-def _wait_port(port, timeout=30.0):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        with socket.socket() as s:
-            if s.connect_ex(("127.0.0.1", port)) == 0:
-                return
-        time.sleep(0.2)
-    raise RuntimeError(f"server on :{port} never came up")
 
 
 @pytest.fixture(scope="module")
@@ -54,15 +39,16 @@ def servers(tmp_path_factory):
     shutil.rmtree(tmp / "data" / "raw", ignore_errors=True)
     procs = []
     try:
-        for port, features in ((PORT_ON, str(tmp / "features_on.json")),
-                               (PORT_OFF, str(tmp / "features_off_missing"))):
+        port_on, port_off = free_ports(2)
+        for port, features in ((port_on, str(tmp / "features_on.json")),
+                               (port_off, str(tmp / "features_off_missing"))):
             procs.append(subprocess.Popen(
                 [sys.executable, "-m", "uvicorn", "serve:app",
                  "--host", "127.0.0.1", "--port", str(port)],
                 cwd=REPO, env=dict(env, GEOMAG_MODEL_EXPLORER_FEATURES=features),
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-            _wait_port(port)
-        yield f"http://127.0.0.1:{PORT_ON}", f"http://127.0.0.1:{PORT_OFF}"
+            wait_port(port, procs[-1])
+        yield f"http://127.0.0.1:{port_on}", f"http://127.0.0.1:{port_off}"
     finally:
         for p in procs:
             p.terminate()

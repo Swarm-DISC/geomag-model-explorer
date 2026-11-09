@@ -1,18 +1,17 @@
 """Shared-secret gate + tiny in-memory rate limiter for the mutating web routes (Starlette).
 
-Foundry-wide hardening (REVIEW #6): the day-fetch POST (which triggers host VirES fetch/export
-subprocesses) used to be ungated ("gate at nginx" — never actually enforced). This adds a uniform,
-dependency-free auth layer:
+The day-fetch POST triggers VirES fetch/export subprocesses on the host, so it is gated by a
+shared secret. This module is a small, dependency-free auth layer:
 
-- The secret is resolved at request time from the env var ``FOUNDRY_API_TOKEN`` (if set and
-  non-empty), else from the file ``~/.config/foundry/api-token`` (whitespace-stripped). It is
-  **never** baked into the repo or the served page.
-- A request authenticates by sending the token in ``X-Foundry-Token`` (or ``Authorization:
+- The secret is resolved at request time from the env var ``GEOMAG_API_TOKEN`` (if set and
+  non-empty), else from the file named by the env var ``GEOMAG_API_TOKEN_FILE``
+  (whitespace-stripped). There is no default file path. The secret is **never** baked into the
+  repo or the served page.
+- A request authenticates by sending the token in ``X-API-Token`` (or ``Authorization:
   Bearer <token>``); it is compared with ``hmac.compare_digest`` (constant time).
 - FAIL CLOSED: if no token is configured at all, every gated route rejects.
-
-This small module is intentionally duplicated per repo (the foundry repos are independent — no
-cross-repo package).
+- Rate limit per client IP: ``GEOMAG_RATE_LIMIT`` requests (default 10) per
+  ``GEOMAG_RATE_WINDOW_S`` seconds (default 60).
 """
 from __future__ import annotations
 
@@ -23,26 +22,28 @@ from collections import deque
 from pathlib import Path
 from threading import Lock
 
-RATE_LIMIT_MAX = int(os.environ.get("FOUNDRY_RATE_LIMIT", "10"))
-RATE_LIMIT_WINDOW_S = float(os.environ.get("FOUNDRY_RATE_WINDOW_S", "60"))
-
-_TOKEN_FILE = Path.home() / ".config" / "foundry" / "api-token"
+RATE_LIMIT_MAX = int(os.environ.get("GEOMAG_RATE_LIMIT", "10"))
+RATE_LIMIT_WINDOW_S = float(os.environ.get("GEOMAG_RATE_WINDOW_S", "60"))
 
 
 def resolve_secret() -> str:
-    """Return the configured shared secret, or '' if none is configured (env unset AND file
-    missing/empty). Resolved fresh each call so a rotated token/file takes effect without a restart."""
-    env = os.environ.get("FOUNDRY_API_TOKEN")
+    """Return the configured shared secret, or '' if none is configured (env unset AND token
+    file unset/missing/empty). Resolved fresh each call so a rotated token/file takes effect
+    without a restart."""
+    env = os.environ.get("GEOMAG_API_TOKEN")
     if env and env.strip():
         return env.strip()
+    path = (os.environ.get("GEOMAG_API_TOKEN_FILE") or "").strip()
+    if not path:
+        return ""
     try:
-        return _TOKEN_FILE.read_text().strip()
+        return Path(path).expanduser().read_text().strip()
     except OSError:
         return ""
 
 
 def _presented(request) -> str:
-    tok = request.headers.get("X-Foundry-Token")
+    tok = request.headers.get("X-API-Token")
     if tok and tok.strip():
         return tok.strip()
     auth = request.headers.get("Authorization") or ""

@@ -6,8 +6,9 @@ test seam). One fetch job at a time; concurrent picks queue; a day exists for
 clients iff it appears in web/data/manifest.json (export publishes it last,
 atomically).
 
-Behind the portal at /foundry/geomag-model-explorer/ (the frontend uses only relative
-URLs, so no prefix handling is needed here).
+Can be served behind a reverse proxy under a path prefix such as
+/tools/geomag-model-explorer/ (the frontend uses only relative URLs, so no prefix
+handling is needed here).
 
     uv run --extra fetch uvicorn serve:app --host 0.0.0.0 --port 8212
 
@@ -226,10 +227,10 @@ async def api_days(request):
 
 async def api_post_day(request):
     # Auth gate: this POST triggers host VirES fetch/export subprocesses. Require the shared
-    # secret (X-Foundry-Token / Bearer, constant-time) + a per-IP rate limit; fails closed.
+    # secret (X-API-Token / Bearer, constant-time) + a per-IP rate limit; fails closed.
     if not check_token(request):
         return JSONResponse(
-            {"error": "auth required: send X-Foundry-Token"}, status_code=401)
+            {"error": "auth required: send X-API-Token"}, status_code=401)
     client = request.client.host if request.client else "?"
     if not _limiter.allow(client):
         return JSONResponse({"error": "rate limit exceeded"}, status_code=429)

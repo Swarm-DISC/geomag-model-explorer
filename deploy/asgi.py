@@ -8,7 +8,7 @@ relative URLs) handle the rest.
 
 If a deployment instead strips the prefix upstream, the path simply won't start with it and
 we pass the request through unchanged, so this is correct either way. With no ``$URL_PREFIX``
-set it is a transparent pass-through (the local/portal setup is unaffected).
+set it is a transparent pass-through (a plain local or systemd setup is unaffected).
 """
 from __future__ import annotations
 

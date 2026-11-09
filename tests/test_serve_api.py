@@ -26,6 +26,8 @@ def served(tmp_path, monkeypatch):
     monkeypatch.setenv("GEOMAG_MODEL_EXPLORER_FETCH_CMD", STUB)
     monkeypatch.setenv("GEOMAG_MODEL_EXPLORER_EXPORT_CMD", EXPORT)
     monkeypatch.setenv("GEOMAG_MODEL_EXPLORER_FEATURES", str(tmp_path / "features.json"))
+    monkeypatch.setenv("GEOMAG_API_TOKEN", "test-token-serve-api")
+    monkeypatch.delenv("GEOMAG_API_TOKEN_FILE", raising=False)
     (tmp_path / "data").mkdir()
     (tmp_path / "data" / "validity.json").write_text(json.dumps(
         {"start": "2013-11-25T03:00:00Z", "end": "2023-11-30T21:00:00Z"}))
@@ -33,12 +35,10 @@ def served(tmp_path, monkeypatch):
         sys.modules.pop(mod, None)
     serve = importlib.import_module("serve")
     client = TestClient(serve.app)
-    # The day-fetch POST is token-gated (REVIEW #6); carry the token by default so the
+    # The day-fetch POST is token-gated; carry the token by default so the
     # functional tests below exercise the post-auth behavior.
     import _auth
-    secret = _auth.resolve_secret()
-    if secret:
-        client.headers["X-Foundry-Token"] = secret
+    client.headers["X-API-Token"] = _auth.resolve_secret()
     yield serve, client, tmp_path
     for mod in ("fetch", "export", "serve"):
         sys.modules.pop(mod, None)
@@ -78,17 +78,39 @@ def test_features_endpoint(served):
 
 
 def test_day_fetch_requires_token(served):
-    """The day-fetch POST rejects a token-less request before any validity check (REVIEW #6)."""
+    """The day-fetch POST rejects a token-less request before any validity check."""
     _serve, client, _tmp = served
-    import _auth
-    if not _auth.resolve_secret():
-        pytest.skip("no foundry token configured in this environment")
-    anon = TestClient(_serve.app)  # no X-Foundry-Token header
+    anon = TestClient(_serve.app)  # no X-API-Token header
     assert anon.post("/api/days/2021-03-17").status_code == 401
     assert anon.post("/api/days/not-a-date").status_code == 401  # auth runs before date parsing
     # read-only routes stay open
     assert anon.get("/api/days").status_code == 200
     assert anon.get("/api/features").status_code == 200
+    # a wrong token is rejected; Authorization: Bearer is accepted as an alternative header
+    assert anon.post("/api/days/not-a-date",
+                     headers={"X-API-Token": "wrong"}).status_code == 401
+    assert anon.post("/api/days/not-a-date",
+                     headers={"Authorization": "Bearer test-token-serve-api"}).status_code == 400
+
+
+def test_token_resolution(tmp_path, monkeypatch):
+    """GEOMAG_API_TOKEN (non-empty) wins, else the file named by GEOMAG_API_TOKEN_FILE;
+    with neither there is no secret and the gate fails closed."""
+    import _auth
+    monkeypatch.delenv("GEOMAG_API_TOKEN", raising=False)
+    monkeypatch.delenv("GEOMAG_API_TOKEN_FILE", raising=False)
+    assert _auth.resolve_secret() == ""
+    tok = tmp_path / "token"
+    tok.write_text("  from-file\n")
+    monkeypatch.setenv("GEOMAG_API_TOKEN_FILE", str(tok))
+    assert _auth.resolve_secret() == "from-file"
+    monkeypatch.setenv("GEOMAG_API_TOKEN", "   ")  # blank env falls through to the file
+    assert _auth.resolve_secret() == "from-file"
+    monkeypatch.setenv("GEOMAG_API_TOKEN", "from-env")
+    assert _auth.resolve_secret() == "from-env"
+    monkeypatch.delenv("GEOMAG_API_TOKEN")
+    monkeypatch.setenv("GEOMAG_API_TOKEN_FILE", str(tmp_path / "missing"))
+    assert _auth.resolve_secret() == ""
 
 
 def test_invalid_and_out_of_range_dates(served):

@@ -21,6 +21,7 @@ assets = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+markers = ["browser: drives the app in headless Chromium + WebGL (minutes; deselect with -m 'not browser')"]
 
 [dependency-groups]
 dev = [

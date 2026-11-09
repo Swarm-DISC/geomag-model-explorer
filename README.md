@@ -96,7 +96,7 @@ globe.
 | `serve.py` | starlette on :8212 — static frontend + tiles + day-fetch job API |
 | `web/` | no-build frontend: ES modules + importmap, three.js vendored; flagged feature modules under `web/features/` |
 | `features.json` | deploy-time feature flags, served at `/api/features`; a feature is dark until enabled here (PLAN v2.1 governance) |
-| `deploy/` | systemd `--user` unit + portal handoff |
+| `deploy/` | example systemd `--user` unit; Docker image (`Dockerfile`, `entrypoint.sh`, prefix-aware `asgi.py`) |
 
 See `PLAN.md` for current state and next steps (full v1 design archived in
 `HISTORY.md`) and
@@ -124,20 +124,31 @@ checkout; the layout under it mirrors `data/` + `web/data/`.
 ## Tests
 
 ```sh
-uv run pytest            # unit + API + browser (needs the service on :8212)
+uv run pytest -m "not browser"   # quick loop: unit + API
+uv run pytest                    # everything, incl. the browser suites
 ```
 
-Browser tests run headless Chromium (Playwright) against the live service —
-real interactions, zero console errors, screenshots in `tests/artifacts/`.
+Browser tests run headless Chromium (Playwright; `uv run playwright install chromium`
+once) — real interactions, zero console errors, screenshots in `tests/artifacts/`.
+Most suites start their own sandboxed server on free ports with synthetic data;
+`tests/test_browser.py` targets a live service on :8212 (and, with
+`GEOMAG_PROXY_URL` set, the app behind a reverse-proxy path prefix).
 
 ## Deploy
 
 ```sh
-cp deploy/geomag-model-explorer-web.service ~/.config/systemd/user/
+systemctl --user link "$PWD"/deploy/geomag-model-explorer-web.service
 systemctl --user daemon-reload && systemctl --user enable --now geomag-model-explorer-web
 ```
 
-Portal wiring (nginx at `/foundry/geomag-model-explorer/`): `deploy/PORTAL_HANDOFF.md`.
+The unit is an example for a checkout at `~/geomag-model-explorer`, serving on
+127.0.0.1:8212; adjust paths, bind address and environment with a systemd drop-in
+(`systemctl --user edit geomag-model-explorer-web`). On-demand day fetches from the UI
+need a shared secret in `GEOMAG_API_TOKEN` (or a file named by `GEOMAG_API_TOKEN_FILE`);
+without one, `POST /api/days` is rejected. The frontend uses only relative URLs, so it
+can be served behind a reverse proxy under a path prefix such as
+`/tools/geomag-model-explorer/`. For a container deployment see `deploy/Dockerfile`
+(`URL_PREFIX`, `VIRES_TOKEN`, `GEOMAG_MODEL_EXPLORER_DATA`).
 
 ## Attribution
 

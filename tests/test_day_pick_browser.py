@@ -1,4 +1,4 @@
-"""End-to-end day-pick UX against a sandboxed server (:8238) whose fetch
+"""End-to-end day-pick UX against a sandboxed server whose fetch
 subprocess is the synthetic stub: picking an uncached day shows the progress
 chip, the job completes, and the new day renders — all without VirES."""
 from __future__ import annotations
@@ -6,33 +6,21 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import socket
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
+from _sandbox import free_ports, wait_port
 
 REPO = Path(__file__).resolve().parent.parent
-PORT = 8238
 SEED_DAY = "2020-01-01"
 PICK_DAY = "2021-03-17"
 TIMEOUT_MS = 120_000
-# The day-fetch POST fails closed without a configured secret (REVIEW #6), so
-# the stub server gets one and the page pre-caches it — the deployed shape,
-# where the portal user's token already sits in localStorage.
+# The day-fetch POST fails closed without a configured secret, so the stub
+# server gets one and the page pre-caches it — the deployed shape, where the
+# user's token already sits in localStorage.
 API_TOKEN = "test-token-daypick"
-
-
-def _wait_port(port, timeout=30.0):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        with socket.socket() as s:
-            if s.connect_ex(("127.0.0.1", port)) == 0:
-                return
-        time.sleep(0.2)
-    raise RuntimeError(f"server on :{port} never came up")
 
 
 @pytest.fixture(scope="module")
@@ -42,7 +30,7 @@ def stub_server(tmp_path_factory):
                GEOMAG_MODEL_EXPLORER_DATA=str(tmp),
                GEOMAG_MODEL_EXPLORER_FETCH_CMD=f"{sys.executable} tests/stub_fetch.py",
                GEOMAG_MODEL_EXPLORER_EXPORT_CMD=f"{sys.executable} export.py",
-               FOUNDRY_API_TOKEN=API_TOKEN)
+               GEOMAG_API_TOKEN=API_TOKEN)
     (tmp / "data").mkdir()
     (tmp / "data" / "validity.json").write_text(json.dumps(
         {"start": "2013-11-25T03:00:00Z", "end": "2023-11-30T21:00:00Z"}))
@@ -55,14 +43,15 @@ def stub_server(tmp_path_factory):
     # the seed day's raw npz is dead weight on the small tmpfs (the day
     # fetched on demand during the test writes its own raw fresh)
     shutil.rmtree(tmp / "data" / "raw", ignore_errors=True)
+    (port,) = free_ports(1)
     server = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "serve:app",
-         "--host", "127.0.0.1", "--port", str(PORT)],
+         "--host", "127.0.0.1", "--port", str(port)],
         cwd=REPO, env=env,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        _wait_port(PORT)
-        yield f"http://127.0.0.1:{PORT}"
+        wait_port(port, server)
+        yield f"http://127.0.0.1:{port}"
     finally:
         server.terminate()
         server.wait(timeout=10)
@@ -73,7 +62,7 @@ def stub_server(tmp_path_factory):
 def test_pick_uncached_day_shows_progress_then_renders(stub_server, page):
     page.set_viewport_size({"width": 800, "height": 600})
     page.add_init_script(
-        f"localStorage.setItem('foundry_token', '{API_TOKEN}')")
+        f"localStorage.setItem('geomag_api_token', '{API_TOKEN}')")
     errors = []
     page.on("pageerror", lambda exc: errors.append(f"pageerror: {exc}"))
     page.on("console", lambda m: errors.append(f"console.error: {m.text}")

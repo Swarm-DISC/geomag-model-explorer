@@ -4,26 +4,24 @@ globe overlay appears after a grace delay and hides on the atomic commit,
 the colorbar relabel is deferred to that commit, tile failures surface as a
 retryable error overlay, and an idle prefetch warms the ±2 neighbor shells.
 
-Sandboxed server on :8239 (8213-8223 are squatted by unrelated fleet
-services). Tile latency/failure is injected by a page-side fetch shim —
-`window.__tileDelayMs` / `window.__tileFail` — so no server delay knob and
-no blocking Playwright route handlers are needed.
+Sandboxed server on a free port (tests/_sandbox.py). Tile latency/failure
+is injected by a page-side fetch shim — `window.__tileDelayMs` /
+`window.__tileFail` — so no server delay knob and no blocking Playwright
+route handlers are needed.
 """
 from __future__ import annotations
 
 import json
 import os
 import shutil
-import socket
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
+from _sandbox import free_ports, wait_port
 
 REPO = Path(__file__).resolve().parent.parent
-PORT = 8239
 SEED_DAY = "2020-01-01"
 SERIES_ID = "mio-seasonal-2020"
 TIMEOUT_MS = 120_000
@@ -52,16 +50,6 @@ FETCH_SHIM = """
 """
 
 
-def _wait_port(port, timeout=30.0):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        with socket.socket() as s:
-            if s.connect_ex(("127.0.0.1", port)) == 0:
-                return
-        time.sleep(0.2)
-    raise RuntimeError(f"server on :{port} never came up")
-
-
 @pytest.fixture(scope="module")
 def server(tmp_path_factory):
     """Seeded sandbox (static + day + series, for the mode-switch test)."""
@@ -80,14 +68,15 @@ def server(tmp_path_factory):
         subprocess.run([sys.executable, *args], cwd=REPO, env=env, check=True,
                        capture_output=True)
     shutil.rmtree(tmp / "data" / "raw", ignore_errors=True)
+    (port,) = free_ports(1)
     proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "serve:app",
-         "--host", "127.0.0.1", "--port", str(PORT)],
+         "--host", "127.0.0.1", "--port", str(port)],
         cwd=REPO, env=dict(env, GEOMAG_MODEL_EXPLORER_FEATURES=str(features)),
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        _wait_port(PORT)
-        yield f"http://127.0.0.1:{PORT}"
+        wait_port(port, proc)
+        yield f"http://127.0.0.1:{port}"
     finally:
         proc.terminate()
         proc.wait(timeout=10)

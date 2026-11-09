@@ -23,7 +23,7 @@ Items marked **landed** shipped on this branch; the rest are recommendations.
 The binding constraint was **per-request gzip level 9 on the single uvicorn
 event loop** (measured 23.7 MB/s single-core: 2.9 ms per 99 KB tile, 11.5 ms
 per 392 KB). Egress (~130 Mbps peak), RAM (~2.5 GB incl. an export job) and
-the portal rate limit (POST /api/days only) never bind.
+the in-app rate limit (POST /api/days only) never bind.
 
 | Scenario | Viewers before p95 > 1 s (pre-branch) | After precompression |
 |---|---|---|
@@ -45,7 +45,7 @@ playback loops free; the remaining 3G first-visit cost is the vendor bundle
   `Cache-Control: public, max-age=1y, immutable` on tiles, `no-cache` on
   manifest.json. Fallback gzip level 6 (+47% throughput, +0.04% bytes).
   Activation on an existing corpus: `uv run python export.py
-  --compress-existing` (idempotent, ~84 s for 2 GB) — run from the primary
+  --compress-existing` (idempotent, ~84 s for 2 GB) — run from the main
   checkout, never a worktree (RULES §10).
 - **Manifest parse cache** keyed on stat (the 2 s /api/days poll re-parsed
   85 KB JSON on the event loop).
@@ -113,7 +113,7 @@ Coarser-grid re-exports decimate from existing raw (no refetch); only crust
 
 | # | Area | Recommendation |
 |---|---|---|
-| B3 | Static offload | nginx (gzip_static/sendfile/HTTP-2) in front of tiles moves the ceiling to the NIC. Cross-repo: portal nginx (internal portal repo) must mount the data tree, or a sidecar joins deploy/Dockerfile. Previews keep the pure-Python path |
+| B3 | Static offload | nginx (gzip_static/sendfile/HTTP-2) in front of tiles moves the ceiling to the NIC. The front proxy must then mount the data tree, or an nginx sidecar joins deploy/Dockerfile. Previews keep the pure-Python path |
 | B9 | int8 for MIO/MMA (ladder rung 4) | **deprioritized**: Table A dominates it losslessly; int8 at fixed qrange = ~16 colormap steps of banding |
 | B10 | Vendor bundle | not recommended now: immutable-caching vendor files is unsafe until paths are versioned (they don't change on upgrade); a tree-shaken three.js (−50–60%) would need a PLAN amendment (RULES §6 no-build-step) |
 | B11 | Local SH evaluation (chaosmagpy/ppigrf) | strategic option only — "evaluated via viresclient only" is a project premise (PLAN §1); would need an explicit PLAN amendment + A/B numeric diff vs eval_model. Motivating datapoint: the monthly@1° secular plan projected ~7 h of VirES fetch; quarterly@2° measured 46 min |

@@ -1,5 +1,5 @@
 """Model families + core SV UI (PLAN v2.9/v2.10/v2.11/v2.14) against a
-sandboxed server with the `families` flag on (:8228): the "Explore category"
+sandboxed server with the `families` flag on: the "Explore category"
 pills are primary and the "Model" dropdown lenses them, All×CHAOS swaps the
 date picker for the curated diurnal series, layers a family lacks grey out
 with family-aware tooltips, the pills never grey out — choosing a category
@@ -9,7 +9,7 @@ family permalinks round-trip. v2.11 adds the Crust (timeless static series)
 and Magnetosphere (kind-less, day-cache + diurnal reuse) studies,
 single-field families (LCS-1, MMA_SHA_2F seeded here; the others are
 data-driven clones), permanently greyed unevaluated entries (MLI_SHA_2E,
-AMPS), and the ⓘ model-info modal. The flag-off server (:8229, same data,
+AMPS), and the ⓘ model-info modal. The flag-off server (same data,
 studies still on) shows no Model dropdown and degrades secular/diurnal
 series links to v1 (F6).
 
@@ -21,20 +21,15 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import socket
 import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 import pytest
+from _sandbox import free_ports, wait_port
 
 REPO = Path(__file__).resolve().parent.parent
-# 8213-8223 are occupied by unrelated fleet services on this host (v2.13
-# finding) — the suite moved to the free range with v2.14
-PORT_ON = 8228
-PORT_OFF = 8229
 SEED_DAY = "2020-01-01"
 ANNUAL_ID = "mio-seasonal-2020"
 SECULAR_ID = "core-secular"
@@ -47,16 +42,6 @@ TIMEOUT_MS = 120_000
 DEMO_CORE = f"#tab=core&series={SECULAR_ID}&f=core-sv&c=Up&s=cmb"
 DEMO_CHAOS = (f"#family=chaos&tab=daily&series={CHAOS_DAY_ID}"
               "&e=2020-01-01T12:00&f=core,crust,magneto&c=Up&s=h300")
-
-
-def _wait_port(port, timeout=30.0):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        with socket.socket() as s:
-            if s.connect_ex(("127.0.0.1", port)) == 0:
-                return
-        time.sleep(0.2)
-    raise RuntimeError(f"server on :{port} never came up")
 
 
 @pytest.fixture(scope="module")
@@ -107,16 +92,17 @@ def servers():
         shutil.rmtree(tmp / "data" / "raw", ignore_errors=True)
         procs = []
         try:
-            for port, features in ((PORT_ON, tmp / "features_on.json"),
-                                   (PORT_OFF, tmp / "features_off.json")):
+            port_on, port_off = free_ports(2)
+            for port, features in ((port_on, tmp / "features_on.json"),
+                                   (port_off, tmp / "features_off.json")):
                 procs.append(subprocess.Popen(
                     [sys.executable, "-m", "uvicorn", "serve:app",
                      "--host", "127.0.0.1", "--port", str(port)],
                     cwd=REPO,
                     env=dict(env, GEOMAG_MODEL_EXPLORER_FEATURES=str(features)),
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-                _wait_port(port)
-            yield f"http://127.0.0.1:{PORT_ON}", f"http://127.0.0.1:{PORT_OFF}"
+                wait_port(port, procs[-1])
+            yield f"http://127.0.0.1:{port_on}", f"http://127.0.0.1:{port_off}"
         finally:
             for p in procs:
                 p.terminate()

@@ -58,12 +58,12 @@ Key parameters (rationale in HISTORY.md): tiles are int16 NEC triples,
 decoded to RGBA16F textures; storage `qrange` is decoupled from display
 `vmax`; colorbar range = sum of enabled fields' per-shell p99 (manifest,
 per day); MIO at 2°, MMA at 2°, MCO/MLI at 1°; ~320 MB of tiles per cached
-day. Deploy: systemd `--user` unit `geomag-model-explorer-web.service`
-(:8212, its own data dir via `GEOMAG_MODEL_EXPLORER_DATA`), portal prefix
-`/foundry/geomag-model-explorer/`, redeploy = restart; branch previews on
-the Heimdall :8300 portal serve the checkout's exported data via
-`.heimdall.toml` data_mounts. Published via Heimdall `mirror` to
-`Swarm-DISC/geomag-model-explorer` — merging to `main` publishes.
+day. Deploy: a LAN systemd `--user` service `geomag-model-explorer-web.service`
+(:8212, its own data dir via `GEOMAG_MODEL_EXPLORER_DATA`; example unit in `deploy/`),
+served under a path prefix such as `/tools/geomag-model-explorer/` behind a reverse proxy
+(relative URLs keep the app prefix-agnostic). A public Docker deployment is built from
+`deploy/` (`deploy/Dockerfile`, `deploy/asgi.py` for `$URL_PREFIX`). Source:
+`Swarm-DISC/geomag-model-explorer`.
 
 ## 2. Live operational concerns
 
@@ -80,7 +80,7 @@ temporal parameterisation). Landed in this pass:
   per-request gzip on the single event loop was the binding constraint, not
   bandwidth or RAM. Fallback gzip runs at level 6 (+47% throughput, +0.04%
   bytes vs the old level-9 default). The manifest parse is cached on stat.
-  **One-time activation on the primary checkout after merge** (one block,
+  **One-time activation on the development checkout after merge** (one block,
   before any new day-fetch POST): re-export every cached day and series from
   raw (`export.py --day <d>` / `--series <id>` — no VirES contact; this
   applies the v5 per-shell qranges below), then
@@ -140,13 +140,15 @@ Carried forward — still open, not yet decisions:
   `fetch.py --validity` periodically (or check at serve start) so new CI
   product releases extend the date picker — the May/October 2024 G5 storms
   are the prize waiting behind this (IDEAS §6.3).
-- **Portal/Ansible clobber risk** (pre-existing, all foundry projects): the
-  internal portal role's `foundry-stub.html.j2` is stale (knows only
-  vizlab) and written with `force: true` — an Ansible re-run would drop the
-  geomag-model-explorer card from the live foundry index. Fix belongs in the
-  internal portal repo.
 - **Day-fetch endpoint is a write surface**: single-job queue + validity
-  validation suffice on the trusted portal network; revisit if exposed wider.
+  validation + the in-app token gate suffice on a trusted network; revisit if exposed wider.
+
+**Browser-suite ports (fixed 2026-10-19).** The "port allocation needs a
+rework" finding below came back: other services on the development host had
+taken the suites' fixed ports, so the studies, frame and timeseries suites
+adopted those services and every readiness wait timed out (not a
+swiftshader/WebGL issue). Every sandbox suite now binds OS-assigned free
+ports and fails fast if its own server dies (`tests/_sandbox.py`).
 
 ## 3. Next phases
 
@@ -210,11 +212,11 @@ recorded here.
 zero pageerror/console.error, incl. a flag-off port): view toggle, click-vs-
 drag pinning + marker, geodetic snap, charts-match-`lookup()`, convention
 sign flips, LRU neutrality + cancellation, permalink round-trip. Then a
-real-data pass on the Heimdall :8300 branch preview (diurnal Sq at a
+real-data pass on a branch preview (diurnal Sq at a
 mid-latitude pin; `core-secular` and `mio-seasonal-2020` for multi-epoch
 variation) before merge.
 
-*Verified 2026-07-15*: 10/10 new browser tests green (22 s, :8224/:8225);
+*Verified 2026-07-15*: 10/10 new browser tests green (22 s);
 fast suites 54 green; permalink suite 5 green after fixing a stale
 pre-v2.12 expectation (garbage-hash default pos is 32 since the boot-time
 tune — it fails on `main` too). Real-data preview pass: Niemegk-ish surface
@@ -224,11 +226,11 @@ core/crust; `core-secular` charts 10 yearly nT/yr epochs at the CMB;
 and geodetic snapping all exercised (screenshots
 `tests/artifacts/live_v213_*.png`). One layout fix landed en route: the
 shared x axis is drawn only on the bottom panel, or combined mode collapses
-the plot areas to zero height. Host finding for MAINTENANCE: every
-pre-v2.13 browser suite's fixed ports (8213–8223) are now occupied by
-unrelated fleet services, so those suites silently probe foreign servers
-and time out — port allocation needs a rework (the new suite sits on the
-free 8224/8225).
+the plot areas to zero height. Host finding: every
+pre-v2.13 browser suite's fixed ports were occupied by unrelated services
+on the development host, so those suites silently probed foreign servers
+and timed out — port allocation needed a rework (since fixed: every
+sandbox suite binds free ports, see §2).
 
 *Updated onto the v2.14 `main`, 2026-07-16*: merged `main` into this branch
 (sole conflict: this file's §3 — both phase records kept) and landed the
@@ -236,13 +238,13 @@ v2.14-prescribed follow-up — `#globe` and `#series-panel` now live inside a
 static `#viewport` (position anchor for the ⓘ overlay), so the button
 survives the globe hiding in series view; the panel appends into `#viewport`
 and the combined split is 42% of the view pane. Suite repairs along the way,
-none v2.13-specific: sun and relief moved off the dead 8213–8223 ports to
-8234–8237 and day-pick to 8238 (the host finding above — all three failed on
-every branch); day-pick additionally needed the shared foundry token wired in
-(stub-server secret + pre-cached localStorage, the deployed shape) — the
-REVIEW #6 fail-closed gate had silently broken it while its port was dead,
+none v2.13-specific: sun, relief and day-pick moved off the occupied ports
+(the host finding above — all three failed on every branch); day-pick
+additionally needed the API token wired in (stub-server secret + pre-cached
+localStorage, the deployed shape) — the fail-closed token gate had silently
+broken it while its port was dead,
 on `main` too (confirmed against a clean `main` worktree). Full suite green
-post-update: 128 passed, 1 skipped. A fresh real-data :8300 preview pass on
+post-update: 128 passed, 1 skipped. A fresh real-data preview pass on
 the updated branch remains the gate before this branch merges to `main`.
 
 **Scope addendum (approved 2026-07-16, direct user request).** Five pre-merge
@@ -267,7 +269,7 @@ refinements to the charts and the Core timeline:
    per-series `grid` override (same pattern as `qrange`);
    `core-secular@igrf` stays 5-yearly at 1° (piecewise-linear generations —
    denser epochs would only interpolate). The addendum's first cut was
-   monthly at 1° — a real CI fetch verified end-to-end, but the fleet-wide
+   monthly at 1° — a real CI fetch verified end-to-end, but the full
    fetch clocked ~7 h and the user revised the resolution down the same
    day (2° spatial, once per 3 months). And (user directive, same day)
    `core-secular@chaos` expands to CHAOS-Core's own availability —
@@ -283,8 +285,8 @@ refinements to the charts and the Core timeline:
    (`nearestEpoch` is instant-based). Pre-merge verification runs against a
    scratch data root (`GEOMAG_MODEL_EXPLORER_DATA`) + local serve on :8240,
    leaving the worktree's symlinked shared data untouched. Post-merge ops,
-   per series, in the primary checkout AND the :8212 service root
-   (`~/.local/share/geomag-model-explorer-deploy`): delete stale
+   per series, in the development checkout AND the :8212 service's data
+   root: delete stale
    `data/raw/series/<id>`, hardlink-copy the scratch raw in, no-op
    `fetch.py --series` (upserts MANIFEST.toml provenance) +
    `export.py --series`, commit MANIFEST.toml, restart the service.
@@ -293,7 +295,7 @@ refinements to the charts and the Core timeline:
 (chart chrome, adaptive x labels incl. the year-rollover rule, readouts,
 37-epoch quarterly timeline) — timeseries 13, families 18 green on the
 quarterly 2° stubs; fetch/export units 55 green (incl. the grid-override
-and step_months epoch tests). Real-data passes: (a) :8300 branch preview,
+and step_months epoch tests). Real-data passes: (a) branch preview,
 16/16 scripted chrome checks + the weekly `mio-seasonal-2020` month-label
 look, zero console errors (`live_v213_addendum_*.png`); (b) a local
 scratch-root server on :8240 (`GEOMAG_MODEL_EXPLORER_DATA`, worktree rules
@@ -311,7 +313,7 @@ Full suite: 131 passed, 1 skipped; `test_serve_api::test_queue_orders_
 and_reports` flakes under heavy fetch load only (passes on a quiet box —
 pre-existing timing sensitivity, not a v2.13 change). Post-merge ops as
 recorded in the addendum: propagate the scratch raw (hardlink) + export
-into the primary checkout and the :8212 service root, commit
+into the development checkout and the :8212 service's data root, commit
 MANIFEST.toml, restart, then `rm -rf /var/tmp/geomag-core-monthly`.
 
 *Post-addendum chart fixes (2026-07-16, direct user request).* Two panel
@@ -332,7 +334,7 @@ splits, bottom-only labels — and no-zoom-on-drag added); full suite 135
 passed, 1 skipped — the serve_api queue test's one failure was tmpfs
 ENOSPC (`/tmp` 4.9G; pytest keeps the last 3 ~1 GB sandbox generations,
 two of them stale from a killed session — a second flake cause besides
-load, cleaned and green on rerun). Scripted :8300 preview pass 7/7 on
+load, cleaned and green on rerun). Scripted preview pass 7/7 on
 real data (`live_v213_fixes_*.png`; code hot-copied into the running
 preview container — a rebuild would drop its fetched data).
 
@@ -426,9 +428,9 @@ control does.
 
 **Verification.** Updated `test_studies_browser.py` /
 `test_families_browser.py` (pill interactions, never-disabled assertion,
-auto-switch + note, modal expression + docs link; new fixtures on ports
-≥ 8226 — 8213–8223 are dead on this host, v2.13 finding); then the real
-gate: LAN :8300 branch-preview pass with real data (landing layout,
+auto-switch + note, modal expression + docs link; fixtures moved off
+ports occupied on the development host, v2.13 finding); then the real
+gate: a branch-preview pass with real data (landing layout,
 auto-switch feedback, modal expressions verbatim from the manifest,
 pre-v2.14 permalink shapes, narrow/short-window stress, keyboard focus),
 screenshots to `tests/artifacts/live_v214_*.png`, record here.
@@ -439,12 +441,12 @@ propagating pill styling to other radio groups; date-picker revival; model
 pills; new series exports.
 
 *Verified 2026-07-15*: browser suites green on the moved ports — studies 6,
-permalink 5, families 18 (8226–8233; the old 8213–8223 fixtures probed
-foreign fleet services and timed out); fast suites 54 green. Becoming
+permalink 5, families 18 (the old fixed-port fixtures probed
+foreign services and timed out); fast suites 54 green. Becoming
 runnable surfaced three latent stale expectations (garbage/refused links
 leave the boot default in charge, and boot pos is 32 since the v2.12
 landing-view tune — same family as 95eda4c); fixed in place. Real-data pass
-on the :8300 `interface-improve` container (scripted Chromium, 39 checks,
+on the `interface-improve` branch preview (scripted Chromium, 39 checks,
 zero console errors): three-layer landing, pills never disabled, IGRF →
 Ionosphere auto-switch with the verbatim chip text and transient clear,
 Model-side grey-out intact, modal expressions byte-equal to
@@ -518,7 +520,7 @@ fields no longer pop in one-by-one on mode switches.
   freeze-until-decoded discipline untouched.
 - Fully-cached scrubs skip the pending UI entirely (no dim/overlay flash).
 - Test handle: `pending()` on `window.geomagModelExplorer`.
-- Verified by `tests/test_loading_browser.py` (sandboxed :8239, page-side
+- Verified by `tests/test_loading_browser.py` (sandboxed on a free port, page-side
   tile latency/failure shim): boot overlay, throttled-scrub dim + deferred
   relabel, cached-scrub no-flash, mode-switch pending, playback never
   pends, failure → retry, idle prefetch warms neighbors. Two existing

@@ -1,11 +1,11 @@
 """Timeline viewer (PLAN v2.13) against a sandboxed server with the
-`timeseries` flag on (:8224): the Globe | Time series | Combined toggle, pin
+`timeseries` flag on: the Globe | Time series | Combined toggle, pin
 by click (drags must not pin) and by coordinate entry (geodetic input snaps
 to the shell ladder), three uPlot panels whose values equal the summed
 lookup() readout, the N/E/Up | R/θ/φ | NEC re-signing, texture-LRU
 neutrality + stale-assembly cancellation, permalink round-trip (view/pt/ptc)
 and the secular-series timeline (37 quarterly 2° epochs, nT/yr units). The
-flag-off server (:8225, same data) has no toggle/panel and silently ignores
+flag-off server (same data) has no toggle/panel and silently ignores
 v2.13 permalink keys (stability contract).
 
 The sandbox lives in /var/tmp (disk, not the host's tmpfs): the seeded
@@ -17,34 +17,21 @@ import json
 import os
 import re
 import shutil
-import socket
 import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 import pytest
+from _sandbox import free_ports, wait_port
 
 REPO = Path(__file__).resolve().parent.parent
-PORT_ON = 8224
-PORT_OFF = 8225
 SEED_DAY = "2020-01-01"
 SECULAR_ID = "core-secular"
 TIMEOUT_MS = 120_000
 
 SECULAR_LINK = (f"#tab=core&series={SECULAR_ID}&f=core-sv&c=Up&s=cmb"
                 "&view=series&pt=52.00,12.00")
-
-
-def _wait_port(port, timeout=30.0):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        with socket.socket() as s:
-            if s.connect_ex(("127.0.0.1", port)) == 0:
-                return
-        time.sleep(0.2)
-    raise RuntimeError(f"server on :{port} never came up")
 
 
 @pytest.fixture(scope="module")
@@ -75,8 +62,9 @@ def servers():
         shutil.rmtree(tmp / "data" / "raw", ignore_errors=True)
         procs = []
         try:
-            for port, features in ((PORT_ON, tmp / "features_on.json"),
-                                   (PORT_OFF, tmp / "features_off.json")):
+            port_on, port_off = free_ports(2)
+            for port, features in ((port_on, tmp / "features_on.json"),
+                                   (port_off, tmp / "features_off.json")):
                 procs.append(subprocess.Popen(
                     [sys.executable, "-m", "uvicorn", "serve:app",
                      "--host", "127.0.0.1", "--port", str(port)],
@@ -84,8 +72,8 @@ def servers():
                     env=dict(env,
                              GEOMAG_MODEL_EXPLORER_FEATURES=str(features)),
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-                _wait_port(port)
-            yield f"http://127.0.0.1:{PORT_ON}", f"http://127.0.0.1:{PORT_OFF}"
+                wait_port(port, procs[-1])
+            yield f"http://127.0.0.1:{port_on}", f"http://127.0.0.1:{port_off}"
         finally:
             for p in procs:
                 p.terminate()

@@ -402,26 +402,26 @@ async function main() {
 
   async function pickDay(day) {
     if (day in manifest.days) { ui.setDay(day); return; }
-    // The day-fetch POST is gated by the foundry token: cached in localStorage (never embedded
-    // in the page) and sent as the X-Foundry-Token header only when already cached — never
+    // The day-fetch POST is gated by a shared API token: cached in localStorage (never embedded
+    // in the page) and sent as the X-API-Token header only when already cached — never
     // prompted proactively. A 401 clears the cache, prompts once, and retries once.
     const post = (token) => fetch(`./api/days/${encodeURIComponent(day)}`,
                                   { method: 'POST',
-                                    headers: token ? { 'X-Foundry-Token': token } : {} });
-    let resp = await post(localStorage.getItem('foundry_token') || '');
+                                    headers: token ? { 'X-API-Token': token } : {} });
+    let resp = await post(localStorage.getItem('geomag_api_token') || '');
     if (resp.status === 401) {
-      localStorage.removeItem('foundry_token');
+      localStorage.removeItem('geomag_api_token');
       const token = (window.prompt(
-        'Foundry API token (stored locally for gated day fetches):') || '').trim();
+        'API token (stored locally for gated day fetches):') || '').trim();
       if (token) {
-        localStorage.setItem('foundry_token', token);
+        localStorage.setItem('geomag_api_token', token);
         resp = await post(token);
       }
     }
     const body = await resp.json().catch(() => ({}));
     ui.setDay(state.day);              // stay on the current day meanwhile
     if (resp.status === 401) {
-      localStorage.removeItem('foundry_token');
+      localStorage.removeItem('geomag_api_token');
       ui.showFetchChip(`${day}: token rejected — re-enter it`, true);
       return;
     }

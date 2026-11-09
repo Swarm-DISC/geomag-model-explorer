@@ -1,5 +1,5 @@
 // Tile fetch + decode -> RGBA16F textures, with an LRU cache and prefetch.
-// All URLs are relative so the app works behind /foundry/geomag-model-explorer/.
+// All URLs are relative so the app works behind a reverse-proxy path prefix.
 import * as THREE from 'three';
 
 const BASE = './data/';

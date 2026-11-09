@@ -763,7 +763,7 @@ def fetch_assets(force: bool = False) -> None:
     print("fetch: assets done; MANIFEST.toml updated.")
 
 
-# --- MANIFEST.toml upsert (vizlab pattern, list-aware) ---
+# --- MANIFEST.toml upsert (list-aware) ---
 
 def _toml_value(v) -> str:
     if isinstance(v, str):

@@ -1,6 +1,7 @@
-# AGENTS.md — geomag-model-explorer session primer
+# AGENTS.md — geomag-model-explorer contributor guide
 
-Agent-agnostic guide; `CLAUDE.md` is a symlink to this file.
+Agent-agnostic guide for anyone (human or coding agent) working on this repository;
+`CLAUDE.md` is a symlink to this file.
 
 **geomag-model-explorer** is a browser-based interactive 3D visualization of
 Earth's geomagnetic field: models served by VirES — the Swarm CI chain as the
@@ -23,30 +24,38 @@ Read these first, in order:
 
 ## Quick facts
 
-- **Port:** 8212 (`geomag-model-explorer-web.service`; portal proxy
-  `/foundry/geomag-model-explorer/`).
-- **Redeploy:** `systemctl --user restart geomag-model-explorer-web.service` (unit in
-  `deploy/`). Note the service serves its **own data dir** (`GEOMAG_MODEL_EXPLORER_DATA`)
-  — browser-verify branch work against the branch's Heimdall **:8300 preview** (which
-  mounts the checkout's `web/data`), not :8212.
-- **Branch work:** this checkout stays **parked on `main`** (rule 10) — never
-  `git switch` it. Claim a branch with `heimdall worktree add geomag-model-explorer
-  <branch>` and work in that worktree (prefer this over generic worktree tooling —
-  it encodes the fleet conventions: fresh-`internal/main` base, data symlinks, the
-  one-branch-one-worktree claim). Run `uv sync` in the worktree first.
-- **Environments:** `uv` project. `uv sync` for dev; `uv sync --extra fetch` only
-  when running `fetch.py` (viresclient). Tests: `uv run pytest`.
-- **Headless browser:** Playwright + Chromium cached workspace-wide. WebGL2 +
-  half-float linear filtering confirmed working headlessly
-  (`tests/webgl_probe_result.json`).
-- **VirES credentials:** `~/.viresclient.ini` (configured & verified
-  2026-06-10). Used only by `fetch.py` — including when `serve.py` invokes it
-  for on-demand day fetches. Never commit tokens.
-- **Prior art to consult:**
-  `/home/ivaldi/foundry/vizlab/projects/geomag-field-globes/` (viresclient
-  eval_model pattern, MANIFEST.toml provenance) and
-  `/home/ivaldi/foundry/vizlab/projects/fancy-globe/` (field value ranges,
-  nio colormap, time interpolation).
+- **Layout:** `fetch.py` is the only module that talks to VirES (→ `data/raw/` +
+  `data/MANIFEST.toml`); `export.py` turns raw npz into quantized tiles under
+  `web/data/` + `web/data/manifest.json`; `serve.py` (starlette) serves the static
+  frontend, the tiles and the day-fetch job API; `web/` is the no-build frontend
+  (ES modules + importmap, three.js vendored). See `README.md` → Layout.
+- **Environments:** `uv` project. `uv sync` for dev (serve, export, tests);
+  `uv sync --extra fetch` (or `uv run --extra fetch …`) when running `fetch.py`
+  (viresclient). The `assets` extra is only needed to regenerate committed textures.
+  In a fresh git worktree run `uv sync` first.
+- **Tests:** `uv run pytest`. `uv run pytest -m "not browser"` is the quick loop (unit
+  + API). The `browser` suites drive the app in headless Chromium via Playwright
+  (`uv run playwright install chromium` once); most start their own sandboxed server
+  on free ports with synthetic data, while `tests/test_browser.py` targets a live
+  service on :8212. WebGL2 + half-float linear filtering work headlessly under
+  SwiftShader (`tests/webgl_probe_result.json`) — keep scenes small and timeouts
+  generous.
+- **Port:** 8212 by default (`uv run uvicorn serve:app --port 8212`).
+- **Data location:** `GEOMAG_MODEL_EXPLORER_DATA=<dir>` relocates the data cache
+  (raw + tiles) off the checkout; the layout under it mirrors `data/` + `web/data/`.
+  A running service serves its own data dir, so verify branch work against a local
+  server on the branch's data, not a production instance.
+- **VirES credentials:** `~/.viresclient.ini` (see the viresclient docs). Used only by
+  `fetch.py` — including when `serve.py` invokes it for on-demand day fetches. Never
+  commit tokens or credentials.
+- **Day-fetch API token:** `POST /api/days/<date>` is gated by a shared secret from
+  `GEOMAG_API_TOKEN` (or the file named by `GEOMAG_API_TOKEN_FILE`), sent as
+  `X-API-Token`; with neither set the route fails closed.
+- **Deploy:** an example systemd `--user` unit in
+  `deploy/geomag-model-explorer-web.service`, and a Docker image
+  (`deploy/Dockerfile`, `deploy/entrypoint.sh`, `deploy/asgi.py` for serving under
+  `$URL_PREFIX`). The frontend uses only relative URLs, so it works behind a
+  reverse proxy under any path prefix.
 
 ## When in doubt
 

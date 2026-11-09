@@ -10,6 +10,8 @@
 # `viresclient set_token` and then does the initial model-evaluation fetch so the globe
 # has data on first load — same credential pattern as Swarm-DISC/SwarmPAL-processor and
 # Swarm-DISC/geospacelab-dashboard. Without a token the app still serves, but with no day data.
+# On-demand day fetches from the UI (POST /api/days) are gated by a separate shared secret:
+# pass `-e GEOMAG_API_TOKEN=<secret>` to enable them; without it every such POST is rejected.
 #
 #   docker run --rm -p 8000:8000 \
 #     -e PORT=8000 -e URL_PREFIX=/experimental/geomag-model-explorer \

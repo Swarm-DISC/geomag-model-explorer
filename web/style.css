@@ -231,11 +231,13 @@ fieldset {
 
 #slot-flags:empty, #slot-frame:empty { display: none; }
 
-/* short windows: the vertically-centered shell slider climbs into the
+/* short globes: the vertically-centered shell slider climbs into the
    top-left corner — lay the box out as a wrapping row to the RIGHT of the
    shell column (which keeps the corner), and drop the hover readout below
-   the row so neither overlaps */
-@media (max-height: 640px) {
+   the row so neither overlaps. Measured on the globe itself (a container
+   query), so the Combined view's shorter globe gets it too, not only a
+   short window. */
+@container globe (max-height: 640px) {
   #vis-options {
     left: 7.5rem;
     max-width: calc(100% - 21rem);   /* clear of the stepped-left ⓘ too */
@@ -386,6 +388,7 @@ fieldset {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  container: globe / size;   /* the overlays below lay out by the globe's height */
 }
 
 /* ---- tile-loading overlay: centered spinner over the globe while
@@ -599,9 +602,11 @@ fieldset {
   color: var(--accent);
 }
 
-/* short windows: the vertically-centered colorbar spans nearly the whole
-   globe — the ⓘ shrinks AND steps left of it. Must come AFTER the base
-   rule above: same specificity, so source order decides. */
+/* short globes (a short window, or the Combined view's upper share): the
+   vertically-centered colorbar spans nearly the whole globe — the ⓘ shrinks
+   AND steps left of it. The ⓘ sits in #viewport, outside the globe's
+   container, so this keys on the window and the view. Must come AFTER the
+   base rule above: source order decides. */
 @media (max-height: 640px) {
   #model-info-btn {
     width: 2.6rem;
@@ -609,6 +614,12 @@ fieldset {
     font-size: 1.4rem;
     right: 7.5rem;               /* the colorbar + labels column is ~6rem */
   }
+}
+body[data-view="combined"] #model-info-btn {
+  width: 2.6rem;
+  height: 2.6rem;
+  font-size: 1.4rem;
+  right: 7.5rem;
 }
 
 dialog#model-info {

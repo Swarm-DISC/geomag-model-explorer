@@ -1,28 +1,25 @@
 """Sunlight feature (PLAN v2.12, superseding the v2.6 overlay) against a
-sandboxed server (:8234) with the flag on: the Sunlight checkbox appears (on
+sandboxed server with the flag on: the Sunlight checkbox appears (on
 by default), toggling shades the globe by day/night (uSunlight/uSunDir
 uniforms — the retired terminator/glyph overlay must never exist), the sun
 direction matches the analytic subsolar point and tracks the time slider,
 and the off state round-trips as sun=0 (absent = on; the pre-v2.12 sun=1
-still parses; garbage ignored). Flag-off (:8235, same data) shows no
+still parses; garbage ignored). Flag-off (same data) shows no
 checkbox and never shades."""
 from __future__ import annotations
 
 import json
 import os
 import shutil
-import socket
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
+from _sandbox import free_ports, wait_port
 
 REPO = Path(__file__).resolve().parent.parent
 ARTIFACTS = Path(__file__).parent / "artifacts"
-PORT_ON = 8234
-PORT_OFF = 8235
 SEED_DAY = "2020-01-01"
 SEED_SERIES = "mio-seasonal-2020"
 TIMEOUT_MS = 120_000
@@ -81,16 +78,6 @@ NO_OVERLAY_JS = ("() => !!window.geomagModelExplorer.globe.scene"
                  ".getObjectByName('sun-overlay')")
 
 
-def _wait_port(port, timeout=30.0):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        with socket.socket() as s:
-            if s.connect_ex(("127.0.0.1", port)) == 0:
-                return
-        time.sleep(0.2)
-    raise RuntimeError(f"server on :{port} never came up")
-
-
 @pytest.fixture(scope="module")
 def servers(tmp_path_factory):
     """One seeded sandbox (static + day); flag on / flag off."""
@@ -113,15 +100,16 @@ def servers(tmp_path_factory):
     shutil.rmtree(tmp / "data" / "raw", ignore_errors=True)
     procs = []
     try:
-        for port, features in ((PORT_ON, str(tmp / "features_on.json")),
-                               (PORT_OFF, str(tmp / "features_off_missing"))):
+        port_on, port_off = free_ports(2)
+        for port, features in ((port_on, str(tmp / "features_on.json")),
+                               (port_off, str(tmp / "features_off_missing"))):
             procs.append(subprocess.Popen(
                 [sys.executable, "-m", "uvicorn", "serve:app",
                  "--host", "127.0.0.1", "--port", str(port)],
                 cwd=REPO, env=dict(env, GEOMAG_MODEL_EXPLORER_FEATURES=features),
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-            _wait_port(port)
-        yield f"http://127.0.0.1:{PORT_ON}", f"http://127.0.0.1:{PORT_OFF}"
+            wait_port(port, procs[-1])
+        yield f"http://127.0.0.1:{port_on}", f"http://127.0.0.1:{port_off}"
     finally:
         for p in procs:
             p.terminate()

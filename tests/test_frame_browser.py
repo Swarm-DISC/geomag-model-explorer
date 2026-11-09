@@ -1,9 +1,9 @@
 """Reference-frame feature (PLAN v2.12; IDEAS 1.4 ECEF/ECI subset) against a
-sandboxed server (:8224) with the flag on: the ECEF|ECI radios appear, ECI
+sandboxed server with the flag on: the ECEF|ECI radios appear, ECI
 poses the earth group by the mean-solar hour angle from the displayed UT
 (+Y polar axis), the hover readout stays geographic under the rotation, and
 frame=eci round-trips through the permalink (garbage ignored). Flag-off
-(:8225, same data) shows no control and an identity pose — exactly v1."""
+(same data) shows no control and an identity pose — exactly v1."""
 from __future__ import annotations
 
 import json
@@ -11,18 +11,15 @@ import math
 import os
 import re
 import shutil
-import socket
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
+from _sandbox import free_ports, wait_port
 
 REPO = Path(__file__).resolve().parent.parent
 ARTIFACTS = Path(__file__).parent / "artifacts"
-PORT_ON = 8224
-PORT_OFF = 8225
 SEED_DAY = "2020-01-01"
 TIMEOUT_MS = 120_000
 
@@ -36,16 +33,6 @@ CANVAS_JS = """
 () => { window.geomagModelExplorer.renderOnce();
         return window.geomagModelExplorer.renderer.domElement.toDataURL(); }
 """
-
-
-def _wait_port(port, timeout=30.0):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        with socket.socket() as s:
-            if s.connect_ex(("127.0.0.1", port)) == 0:
-                return
-        time.sleep(0.2)
-    raise RuntimeError(f"server on :{port} never came up")
 
 
 @pytest.fixture(scope="module")
@@ -68,15 +55,16 @@ def servers(tmp_path_factory):
     shutil.rmtree(tmp / "data" / "raw", ignore_errors=True)
     procs = []
     try:
-        for port, features in ((PORT_ON, str(tmp / "features_on.json")),
-                               (PORT_OFF, str(tmp / "features_off_missing"))):
+        port_on, port_off = free_ports(2)
+        for port, features in ((port_on, str(tmp / "features_on.json")),
+                               (port_off, str(tmp / "features_off_missing"))):
             procs.append(subprocess.Popen(
                 [sys.executable, "-m", "uvicorn", "serve:app",
                  "--host", "127.0.0.1", "--port", str(port)],
                 cwd=REPO, env=dict(env, GEOMAG_MODEL_EXPLORER_FEATURES=features),
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-            _wait_port(port)
-        yield f"http://127.0.0.1:{PORT_ON}", f"http://127.0.0.1:{PORT_OFF}"
+            wait_port(port, procs[-1])
+        yield f"http://127.0.0.1:{port_on}", f"http://127.0.0.1:{port_off}"
     finally:
         for p in procs:
             p.terminate()

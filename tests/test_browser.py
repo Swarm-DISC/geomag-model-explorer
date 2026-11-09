@@ -1,20 +1,24 @@
-"""Browser tests against the LIVE service on :8212 (and the portal prefix).
+"""Browser tests against the LIVE service on :8212 (and, optionally, a reverse-proxy prefix).
 
 Run after `systemctl --user restart geomag-model-explorer-web.service`:
 
     uv run pytest tests/test_browser.py
+
+Set GEOMAG_PROXY_URL (e.g. http://host/tools/geomag-model-explorer) to also check the app
+through a reverse proxy under a path prefix; the prefix test is skipped when it is unset.
 
 SwiftShader software GL: keep viewports small and timeouts generous.
 """
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
 
 BASE = "http://127.0.0.1:8212"
-PORTAL = "http://127.0.0.1:8080/foundry/geomag-model-explorer"
+PROXY = os.environ.get("GEOMAG_PROXY_URL", "").rstrip("/")
 ARTIFACTS = Path(__file__).parent / "artifacts"
 VIEWPORT = {"width": 800, "height": 600}
 TIMEOUT_MS = 60_000
@@ -286,13 +290,12 @@ def test_api_days(page):
     assert isinstance(data["days"], list)
 
 
-@pytest.mark.skip(reason="the /foundry/geomag-model-explorer portal route was removed; a "
-                         "restored route would also need Playwright http_credentials for "
-                         "the vanaheim basic auth")
-def test_portal_prefix(page):
+@pytest.mark.skipif(not PROXY, reason="set GEOMAG_PROXY_URL to test the app behind a "
+                                       "reverse-proxy path prefix")
+def test_proxy_prefix(page):
     page.set_viewport_size(VIEWPORT)
     errors = _collect_errors(page)
-    page.goto(PORTAL + "/", timeout=TIMEOUT_MS)
+    page.goto(PROXY + "/", timeout=TIMEOUT_MS)
     _wait_ready(page)
     assert page.evaluate("() => window.geomagModelExplorer.cacheSize()") > 0
-    assert errors == [], f"browser errors via portal: {errors}"
+    assert errors == [], f"browser errors via proxy: {errors}"

@@ -356,7 +356,7 @@ terminator on the Atlantic limb, Sq blob on screen) and the night floor rose
 just darker (worst-case night × relief hillshade 0.30, was 0.19). Fast
 suites stayed green (54); no test pinned either constant.
 
-**:8300 branch-preview browser pass (2026-07-15) — the remaining-before-merge
+**Branch-preview browser pass (2026-07-15) — the remaining-before-merge
 list, all green: 28/28 checks, zero pageerror/console.error** across every
 section, real interactions throughout. Boot (t=08:00 hash-normalized, night
 quarter visible & darker than day); ECI playback (timePos advances, pose
@@ -411,9 +411,8 @@ Preserved verbatim (headings demoted one level).
 
 *Browser-based interactive 3D visualization of Earth's geomagnetic field.*
 
-This is the working plan grown from `NOTE.md`, informed by the vizlab prior art
-(`geomag-field-globes`, `fancy-globe`) and the old ESA VirES web client
-(an internal web-client framework). It is meant to be discussed and iterated on —
+This is the working plan grown from `NOTE.md`, informed by two earlier unpublished globe prototypes
+and the old ESA VirES web client (WebClient-Framework). It is meant to be discussed and iterated on —
 see **Open questions** at the end. Status: **all phases (0–6) complete;
 shipped 2026-06-11.** Revised 2026-06-10: CI model chain only (no ppigrf), any-day picking
 with on-demand fetch, bottom-docked time slider. Revised 2026-06-11 (Phase 1–2
@@ -471,7 +470,7 @@ Explicitly deferred: field lines, mobile polish.
 | 4 | **Each field keeps its native grid** — no resampling at export | Every enabled field's texture is sampled at the same normalized UV in the shader, so summation needs no common grid. CI models are low-degree (MCO ≤ deg ~18, MLI ≤ deg ~80, MIO/MMA lower still) — 1° grids suffice everywhere, 2° for MMA. |
 | 5 | **Discrete precomputed shells; slider snaps to available radii** | On-GPU radial interpolation is physically wrong for potential fields (power-law decay, not linear). Snap-to-shell is honest and simple. |
 | 6 | **Any-day picking via on-demand fetch + permanent cache** (§5); default day 2020-01-01 pre-fetched at deploy | The only way to satisfy both "precomputed and stored" (no live per-frame evaluation) and an open date picker. A day is fetched once, in a background job with progress UI, then served from cache forever. |
-| 7 | **Serving:** static frontend + tiles + a small day-fetch API via starlette/uvicorn, `uv run`, as systemd `--user` unit `geomag-model-explorer-web.service` on **:8212** | Matches the muninn/huginn pure-uv pattern: redeploy = `systemctl --user restart geomag-model-explorer-web.service`. App must work behind `/foundry/geomag-model-explorer/` (relative URLs only). |
+| 7 | **Serving:** static frontend + tiles + a small day-fetch API via starlette/uvicorn, `uv run`, as systemd `--user` unit `geomag-model-explorer-web.service` on **:8212** | A plain uv-managed service: redeploy = `systemctl --user restart geomag-model-explorer-web.service`. App must work behind a reverse-proxy path prefix (relative URLs only). |
 | 8 | **No build step** — plain ES modules + importmap; three.js vendored into `web/vendor/` and committed | Few modules, one page; keeps redeploy restart-only with no node in the deploy path. Vite is the fallback if module count grows. |
 
 ### 3. Architecture
@@ -514,9 +513,8 @@ color   = texture(lut, 0.5 * (v / vmax) + 0.5)     // diverging nio colormap
 Per-field ranges from prior art (to be confirmed against CI models at fetch
 time): core ±65000 nT, crust ±100 nT, magnetosphere/ionosphere ±25 nT.
 
-**fetch.py** extends the proven pattern in
-`vizlab/projects/geomag-field-globes/fetch.py` (`SwarmRequest.eval_model()` on
-lat/lon meshgrids) to full B_NEC × multiple radii × time series. To keep request
+**fetch.py** extends the proven pattern from an earlier globe prototype
+(`SwarmRequest.eval_model()` on lat/lon meshgrids) to full B_NEC × multiple radii × time series. To keep request
 counts sane it **stacks all shells of a field into one evaluation per timestep**
 (`radius` is per-point) and chunks large point sets; resumable per snapshot.
 
@@ -601,7 +599,6 @@ geomag-model-explorer/
 ├── export.py                      # npz → web/data tiles + manifest.json + LUT
 ├── serve.py                       # starlette: static + day-fetch API, :8212
 ├── deploy/geomag-model-explorer-web.service   # systemd --user unit (Phase 1)
-├── deploy/PORTAL_HANDOFF.md
 ├── data/raw/                      # gitignored; MANIFEST.toml committed
 ├── web/
 │   ├── index.html  style.css  main.js  globe.js  shaders.js  dataset.js  ui.js
@@ -625,8 +622,7 @@ geomag-model-explorer/
   (2026-06-10); confirmed with a minimal `eval_model(models=["IGRF"])` call
   (two points, surface) returning physically sensible B_NEC. viresclient
   0.16.0 in the `fetch` extra. Nothing blocks the data pipeline.
-- **Port 8212: free** (`ss -ltn`), reserved for geomag-model-explorer; next-free in the
-  portal 82xx map.
+- **Port 8212: free** (`ss -ltn`), reserved for geomag-model-explorer.
 - **npm registry: reachable** (HTTP 200) for the one-time three.js vendoring.
 
 ### 8. Phases
@@ -641,9 +637,9 @@ All phases shipped 2026-06-11 (commit history is the detailed record):
   small fetch — token already verified); `export.py` minimal: that tile +
   manifest + nio LUT (chaosmagpy, dev-time only) + coastlines texture.
   three.js scene with one shell + OrbitControls; vendored three.js.
-  `serve.py` (static only) + `deploy/geomag-model-explorer-web.service` installed; portal
-  nginx block + link-card go live. *Verify:* Playwright against `:8212`
-  **and** through the portal prefix; canvas non-blank (pixel readback);
+  `serve.py` (static only) + `deploy/geomag-model-explorer-web.service` installed; the
+  reverse-proxy route goes live. *Verify:* Playwright against `:8212`
+  **and** through the proxy prefix; canvas non-blank (pixel readback);
   drag-rotate changes the view; screenshot for human review.
 - ✅ **Phase 2 — full data pipeline.** `fetch_day`/`fetch_static` per §4
   (shell-stacked, chunked, resumable); export of all four fields; pre-fetch
@@ -668,7 +664,7 @@ All phases shipped 2026-06-11 (commit history is the detailed record):
   stubbed fetcher) completes and renders.
 - ✅ **Phase 6 — polish.** Hover readout (lat/lon + nT via raycast + CPU tile
   lookup), attribution (ESA Swarm/VirES, CI models — DTU/IPGP et al.),
-  colorbar refinement, README, portal card screenshot, PLAN.md
+  colorbar refinement, README, screenshot, PLAN.md
   reconciliation.
 
 ### 9. Open questions (to discuss before/during Phase 2)
@@ -692,23 +688,9 @@ All phases shipped 2026-06-11 (commit history is the detailed record):
 6. **Radial interpolation between shells** — offer later as explicitly
    approximate, or never?
 
-### 10. Portal plan
+### 10. Serving behind a proxy
 
-- Phase 0 (done): static stub `portal/web/foundry/geomag-model-explorer/index.html`
-  ("in planning") + link-card on the foundry index — satisfies the root
-  minimum-visibility rule before anything is served.
-- Phase 1: nginx location `/foundry/geomag-model-explorer/` → `:8212` (modeled on existing
-  blocks, `X-Forwarded-Prefix`, 502/503 fallback to the stub), then
-  `systemctl --user restart portal.service`. Handoff doc in
-  `deploy/PORTAL_HANDOFF.md`.
-- **Caveat (pre-existing, affects all foundry projects):** `/home/ivaldi/portal`
-  is not a git repo — it is deployed by an internal Ansible role
-  (`roles/portal`), whose `foundry-stub.html.j2` template is **stale** (knows
-  only vizlab) and is written with `force: true`. An Ansible re-run would
-  clobber the live foundry index, dropping the geomag-model-explorer card along with
-  bragi/huginn/muninn/urd/jupyterlab. Static-file edits go live without a
-  restart (bind-mounted dir); only `nginx.conf` changes need
-  `systemctl --user restart portal.service`.
+Served behind a reverse proxy under a path prefix; relative URLs keep it prefix-agnostic.
 
 ### 11. Risks & mitigations
 
@@ -716,7 +698,7 @@ All phases shipped 2026-06-11 (commit history is the detailed record):
 |---|---|
 | SwiftShader WebGL limits/perf | Probed up front (§7, PASS). Keep browser-test scenes small; generous timeouts. Fallbacks if a device lacks WebGL2: WebGL1 + half-float extensions, or NEAREST + shader-side bilinear. |
 | First-fetch latency for a new day (minutes) | Shell-stacked, chunked evaluations; background job + progress UI; default day pre-fetched; MIO at 2° (§9.1) cuts the dominant cost ~4×. |
-| Day-fetch endpoint is a write surface (triggers VirES traffic + disk writes) | Single-job queue, per-day dedup, validity-range validation of the date; portal is on a trusted network (same posture as muninn's digest box) — revisit if exposed wider. |
+| Day-fetch endpoint is a write surface (triggers VirES traffic + disk writes) | Single-job queue, per-day dedup, validity-range validation of the date; the service runs on a trusted network — revisit if exposed wider. |
 | VirES rate limits / service hiccups mid-day-fetch | Resumable per-snapshot fetching; job retries; partial days never published to the manifest. |
 | Data size growth (~115 MB per cached day) | Gitignored; disk policy open question §9.3; MIO 2° reduces to ~19 MB/day. |
 | MIO physics (primary/secondary, 110 km sheet) | Sum primary+secondary at fetch time; never evaluate at the sheet; only surface + 450 km shells. |

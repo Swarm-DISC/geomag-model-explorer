@@ -1,27 +1,22 @@
 """Studies feature (PLAN v2.3/v2.10/v2.14) against a sandboxed server
-(:8226) with the flag on: the "Explore category" pills appear, the
+with the flag on: the "Explore category" pills appear, the
 Ionosphere study plays the annual series (timeline swap, series picker,
 iono defaults), permalinks round-trip via tab=/series=/e=, and garbage
-degrades. Flag-off (:8227, same data) shows no category pills — exactly
+degrades. Flag-off (same data) shows no category pills — exactly
 v1."""
 from __future__ import annotations
 
 import json
 import os
 import shutil
-import socket
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
+from _sandbox import free_ports, wait_port
 
 REPO = Path(__file__).resolve().parent.parent
-# 8213-8223 are occupied by unrelated fleet services on this host (v2.13
-# finding) — the suite moved to the free range with v2.14
-PORT_ON = 8226
-PORT_OFF = 8227
 SEED_DAY = "2020-01-01"
 SERIES_ID = "mio-seasonal-2020"
 TIMEOUT_MS = 120_000
@@ -29,16 +24,6 @@ TIMEOUT_MS = 120_000
 # epoch 26 = 2020-01-01 + 26 weeks = 2020-07-01 (leap year)
 DEMO_HASH = (f"#tab=seasons&series={SERIES_ID}&e=2020-07-01T12:00"
              "&f=iono&c=Up&s=surface")
-
-
-def _wait_port(port, timeout=30.0):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        with socket.socket() as s:
-            if s.connect_ex(("127.0.0.1", port)) == 0:
-                return
-        time.sleep(0.2)
-    raise RuntimeError(f"server on :{port} never came up")
 
 
 @pytest.fixture(scope="module")
@@ -62,15 +47,16 @@ def servers(tmp_path_factory):
     shutil.rmtree(tmp / "data" / "raw", ignore_errors=True)
     procs = []
     try:
-        for port, features in ((PORT_ON, str(tmp / "features_on.json")),
-                               (PORT_OFF, str(tmp / "features_off_missing"))):
+        port_on, port_off = free_ports(2)
+        for port, features in ((port_on, str(tmp / "features_on.json")),
+                               (port_off, str(tmp / "features_off_missing"))):
             procs.append(subprocess.Popen(
                 [sys.executable, "-m", "uvicorn", "serve:app",
                  "--host", "127.0.0.1", "--port", str(port)],
                 cwd=REPO, env=dict(env, GEOMAG_MODEL_EXPLORER_FEATURES=features),
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-            _wait_port(port)
-        yield f"http://127.0.0.1:{PORT_ON}", f"http://127.0.0.1:{PORT_OFF}"
+            wait_port(port, procs[-1])
+        yield f"http://127.0.0.1:{port_on}", f"http://127.0.0.1:{port_off}"
     finally:
         for p in procs:
             p.terminate()
